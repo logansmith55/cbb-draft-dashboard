@@ -64,13 +64,13 @@ def add_streak_emoji(streak):
     if streak.startswith('W'):
         num = int(streak[1:])
         if num >= 3:
-            return f"🔥 {streak}"  # long winning streak
+            return f"{streak}🔥"  # long winning streak
         else:
             return streak
     elif streak.startswith('L'):
         num = int(streak[1:])
         if num >= 3:
-            return f"🥶 {streak}"  # long losing streak
+            return f"{streak}🥶"  # long losing streak
         else:
             return streak
     else:
