@@ -281,21 +281,29 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 # --- Main Streamlit App Logic ---
 st.title('Metro Sharon CBB Draft Leaderboard')
 
-# Safe conversion of startDate to datetime
-df_games['startDate'] = pd.to_datetime(df_games['startDate'], errors='coerce')
+# --- Display latest game date safely ---
+if 'startDate' in df_games.columns and not df_games.empty:
+    # Convert to datetime safely
+    df_games['startDate'] = pd.to_datetime(df_games['startDate'], errors='coerce')
 
-# Get latest game date (ignoring NaT)
-if not df_games['startDate'].dropna().empty:
-    latest_game_date = df_games['startDate'].dropna().max()
-    # Convert to Central Time if naive
-    if latest_game_date.tzinfo is None:
-        latest_game_date = latest_game_date.replace(tzinfo=datetime.timezone.utc).astimezone(ZoneInfo("America/Chicago"))
+    # Drop NaT
+    valid_dates = df_games['startDate'].dropna()
+    
+    if not valid_dates.empty:
+        latest_game_date = valid_dates.max()
+
+        # Convert to Central Time
+        if latest_game_date.tzinfo is None:
+            latest_game_date = latest_game_date.replace(tzinfo=datetime.timezone.utc).astimezone(ZoneInfo("America/Chicago"))
+        else:
+            latest_game_date = latest_game_date.astimezone(ZoneInfo("America/Chicago"))
+
+        st.caption(f"Game data as of: {latest_game_date.strftime('%Y-%m-%d %H:%M %Z')}")
     else:
-        latest_game_date = latest_game_date.astimezone(ZoneInfo("America/Chicago"))
-
-    st.caption(f"Game data as of: {latest_game_date.strftime('%Y-%m-%d %H:%M %Z')}")
+        st.caption("Game data as of: N/A")
 else:
     st.caption("Game data as of: N/A")
+
 
 # Display last updated in Central Time
 central_time = datetime.datetime.now(ZoneInfo("America/Chicago"))
