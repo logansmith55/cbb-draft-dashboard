@@ -83,9 +83,8 @@ def load_draft_picks():
         [65, "DePaul", "Sam"],
         [236, "Purdue", "Sam"],
         [292, "Tennessee", "Sam"],
-        [220, "Ole Miss", "Sam"],
+        [220, "Ole Miss", "Sam"]
     ]
-
     return pd.DataFrame(draft, columns=columns)
 
 # Get data from cbbd source
