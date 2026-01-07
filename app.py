@@ -354,7 +354,8 @@ for person_name in df_leaderboard['person'].unique():
         }])
 
         # convert each team's Win Percentage to percentage
-        person_teams_df['Win Percentage'] = (person_teams_df['Win Percentage'] * 100).round(2)
+        person_teams_df['Win Percentage'] = person_teams_df['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
+        summary_row['Win Percentage'] = f"{avg_win_pct:.2f}%"
 
         final_df = pd.concat([person_teams_df, summary_row], ignore_index=True)
         st.dataframe(final_df)
