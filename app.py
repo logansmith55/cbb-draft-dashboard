@@ -310,7 +310,7 @@ for person_name in df_leaderboard['person'].unique():
         person_teams_df = df_merged_picks_standings[
             df_merged_picks_standings['person'] == person_name
         ][
-            ['school', 'Wins', 'Losses', 'Win Percentage', 'Streak']
+            ['school', 'Wins', 'Losses', 'Streak', 'Win Percentage']
         ].sort_values(by='Win Percentage', ascending=False)
 
         # Handle potential division by zero if a person has no games played
@@ -320,8 +320,8 @@ for person_name in df_leaderboard['person'].unique():
             'school': 'Total',
             'Wins': person_teams_df['Wins'].sum(),
             'Losses': person_teams_df['Losses'].sum(),
-            'Win Percentage': avg_win_pct,
-            'Streak': ''
+            'Streak': '',
+            'Win Percentage': avg_win_pct
         }])
 
         final_df = pd.concat([person_teams_df, summary_row], ignore_index=True)
