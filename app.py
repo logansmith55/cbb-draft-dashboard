@@ -360,7 +360,7 @@ for person_name in df_leaderboard['person'].unique():
     with st.expander(f"{person_name}'s Teams"):
        person_teams_df = df_merged_picks_standings[
         df_merged_picks_standings['person'] == person_name
-    ][['school_with_rank', 'Wins', 'Losses', 'Streak', 'Win Percentage']].sort_values(by='Win Percentage', ascending=False)
+        ][['school_with_rank', 'Wins', 'Losses', 'Streak', 'Win Percentage']].sort_values(by='Win Percentage', ascending=False)
 
     # Rename column for display
     person_teams_df = person_teams_df.rename(columns={'school_with_rank': 'school'})
