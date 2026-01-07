@@ -288,9 +288,13 @@ st.caption(f"Last updated: {central_time.strftime('%Y-%m-%d %H:%M %Z')}")
 
 # --- Refresh Button ---
 if st.button("Refresh Data"):
-    fetch_cbbd_data.clear()   # clear API cache
-    process_data.clear()      # clear processing cache
-    st.experimental_rerun()   # safe rerun
+    # Clear caches for all @st.cache_data functions
+    load_draft_picks.clear()
+    fetch_cbbd_data.clear()
+    process_data.clear()
+    
+    # Rerun the app so it reloads fresh data
+    st.experimental_rerun()  # must be inside the button block
 
 # Load and process data
 df_picks = load_draft_picks()
