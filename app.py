@@ -195,8 +195,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     # Merge with picks for drafter performance
     df_merged_picks_standings = pd.merge(df_picks, df_standings, left_on='school', right_on='Team', how='left')
     df_drafter_performance = df_merged_picks_standings.groupby('person')['Win Percentage'].mean().reset_index()
-    df_drafter_performance.rename(columns={'Win Percentage': 'Average Win Percentage'}, inplace=True)
-    df_leaderboard = df_drafter_performance.sort_values(by='Average Win Percentage', ascending=False).reset_index(drop=True)
+    df_leaderboard = df_drafter_performance.sort_values(by='Win Percentage', ascending=False).reset_index(drop=True)
 
     df_drafter_stats = df_merged_picks_standings.groupby('person')[['Wins', 'Losses']].sum().reset_index()
     df_drafter_stats['Total Games Played'] = df_drafter_stats['Wins'] + df_drafter_stats['Losses']
@@ -204,7 +203,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 
     df_leaderboard = df_leaderboard.drop(columns=['Wins_x', 'Losses_x', 'Total Games Played_x'], errors='ignore')
     df_leaderboard.rename(columns={'Wins_y': 'Wins', 'Losses_y': 'Losses', 'Total Games Played_y': 'Total Games Played'}, inplace=True)
-    new_column_order = ['person', 'Wins', 'Losses', 'Total Games Played', 'Average Win Percentage']
+    new_column_order = ['person', 'Wins', 'Losses', 'Total Games Played', 'Win Percentage']
     df_leaderboard = df_leaderboard[new_column_order]
 
     # Create team_games_df (team-level game log)
@@ -291,8 +290,8 @@ df_picks = load_draft_picks()
 df_teams, df_rankings, df_games = fetch_cbbd_data()
 df_leaderboard, df_merged_picks_standings, df_merged_rankings = process_data(df_picks, df_teams, df_rankings, df_games)
 
-# Sort the data by 'Average Win Percentage' in descending order
-leaderboard_data = df_leaderboard.sort_values(by='Average Win Percentage', ascending=False).reset_index(drop=True)
+# Sort the data by 'Win Percentage' in descending order
+leaderboard_data = df_leaderboard.sort_values(by='Win Percentage', ascending=False).reset_index(drop=True)
 
 # Multi-select filter for 'person'
 selected_persons = st.multiselect(
@@ -303,7 +302,8 @@ selected_persons = st.multiselect(
 
 # Filter the dataframe based on selected persons
 filtered_leaderboard = leaderboard_data[leaderboard_data['person'].isin(selected_persons)]
-
+# Convert to percentage
+filtered_leaderboard['Win Percentage'] = (filtered_leaderboard['Win Percentage'] * 100).round(2)
 # Display the filtered and sorted leaderboard
 st.subheader('Overall Leaderboard')
 st.dataframe(filtered_leaderboard)
@@ -320,6 +320,7 @@ for person_name in df_leaderboard['person'].unique():
 
         # Handle potential division by zero if a person has no games played
         avg_win_pct = person_teams_df['Win Percentage'].mean() if not person_teams_df.empty else 0.0
+        avg_win_pct = round(avg_win_pct * 100, 2)  # convert to percentage
 
         summary_row = pd.DataFrame([{
             'school': 'Total',
@@ -328,6 +329,9 @@ for person_name in df_leaderboard['person'].unique():
             'Streak': '',
             'Win Percentage': avg_win_pct
         }])
+
+        # convert each team's Win Percentage to percentage
+        person_teams_df['Win Percentage'] = (person_teams_df['Win Percentage'] * 100).round(2)
 
         final_df = pd.concat([person_teams_df, summary_row], ignore_index=True)
         st.dataframe(final_df)
