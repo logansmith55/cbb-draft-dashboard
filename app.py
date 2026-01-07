@@ -8,7 +8,7 @@ CBBD_ACCESS_TOKEN = st.secrets["CBBD_ACCESS_TOKEN"]
 configuration = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
 
 # Populate draft picks for mapping
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_draft_picks():
     columns = ["team_id", "school", "person"]
 
@@ -88,7 +88,7 @@ def load_draft_picks():
     return pd.DataFrame(draft, columns=columns)
 
 # Get data from cbbd source
-@st.cache_data
+@st.cache_data(ttl=3600)
 def fetch_cbbd_data():
     config = cbbd.Configuration(
         access_token=st.secrets["CBBD_ACCESS_TOKEN"] # stored in Streamlit
@@ -112,7 +112,7 @@ def fetch_cbbd_data():
 
     return df_teams, df_rankings, df_games
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def process_data(df_picks, df_teams, df_rankings, df_games):
     # Calculate team records
     team_records = {}
