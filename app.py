@@ -282,7 +282,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 st.title('Metro Sharon CBB Draft Leaderboard')
 
 # --- Display latest game date safely ---
-if 'startDate' in df_games.columns and not df_games.empty:
+if df_games is not None and isinstance(df_games, pd.DataFrame) and 'startDate' in df_games.columns and not df_games.empty:
     # Convert to datetime safely
     df_games['startDate'] = pd.to_datetime(df_games['startDate'], errors='coerce')
 
@@ -303,6 +303,7 @@ if 'startDate' in df_games.columns and not df_games.empty:
         st.caption("Game data as of: N/A")
 else:
     st.caption("Game data as of: N/A")
+
 
 
 # Display last updated in Central Time
