@@ -281,22 +281,6 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 
 # --- Main Streamlit App Logic ---
 st.title('Metro Sharon CBB Draft Leaderboard')
-
-# --- Handle refresh button with session state ---
-if 'refresh' not in st.session_state:
-    st.session_state.refresh = False
-
-if st.button("Refresh Data"):
-    # Mark refresh request in session state
-    st.session_state.refresh = True
-
-# If refresh requested, clear caches and reset flag
-if st.session_state.refresh:
-    load_draft_picks.clear()
-    fetch_cbbd_data.clear()
-    process_data.clear()
-    st.session_state.refresh = False  # reset to prevent loop
-    st.experimental_rerun()           # safe rerun now
     
 # Display last updated in Central Time
 central_time = datetime.datetime.now(ZoneInfo("America/Chicago"))
