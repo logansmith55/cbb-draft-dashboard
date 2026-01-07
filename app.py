@@ -86,7 +86,7 @@ draft = [
     [292, "Tennessee", "Sam"],
     [220, "Ole Miss", "Sam"],
 ]
-    return pd.DataFrame(draft, columns=columns)
+return pd.DataFrame(draft, columns=columns)
 
 # Get data from cbbd source
 @st.cache_data
