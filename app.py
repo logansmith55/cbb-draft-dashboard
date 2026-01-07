@@ -327,6 +327,8 @@ selected_persons = st.multiselect(
 filtered_leaderboard = leaderboard_data[leaderboard_data['person'].isin(selected_persons)]
 # Convert to percentage
 filtered_leaderboard['Win Percentage'] = (filtered_leaderboard['Win Percentage'] * 100).round(2)
+filtered_leaderboard['Win Percentage'] = filtered_leaderboard['Win Percentage'].apply(lambda x: f"{x:.2f}%")
+
 # Display the filtered and sorted leaderboard
 st.subheader('Overall Leaderboard')
 st.dataframe(filtered_leaderboard)
