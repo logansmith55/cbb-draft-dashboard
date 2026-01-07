@@ -285,8 +285,10 @@ from zoneinfo import ZoneInfo
 import datetime
 
 if st.button("Refresh Data"):
-    # Force Streamlit to rerun everything
-    st.experimental_rerun()
+    # Clear cached functions
+    fetch_cbbd_data.clear()
+    process_data.clear()
+    st.experimental_rerun()  # rerun the app
 
 # Display last updated in Central Time
 central_time = datetime.datetime.now(ZoneInfo("America/Chicago"))
