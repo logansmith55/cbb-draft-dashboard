@@ -281,6 +281,10 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 # --- Main Streamlit App Logic ---
 st.title('Metro Sharon CBB Draft Leaderboard')
 
+st.caption(
+    f"Last updated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+)
+
 # Manual refresh button
 if st.button("🔄 Refresh data now"):
     st.cache_data.clear()
