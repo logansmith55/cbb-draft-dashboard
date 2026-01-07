@@ -284,6 +284,26 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
         direction='backward', allow_exact_matches=True, suffixes=('_team', '_opponent')
     ).rename(columns={'ranking_opponent': 'opponent_ranking', 'week_opponent': 'opponent_ranking_week', 'pollDate_opponent': 'opponent_ranking_pollDate'})
 
+    # --- Create a mapping of latest AP Poll ranking for each team ---
+    latest_rankings = df_rankings.sort_values('pollDate').drop_duplicates('teamId', keep='last')
+    team_rank_map = dict(zip(latest_rankings['teamId'], latest_rankings['ranking']))
+    
+    # Add team_id to df_merged_picks_standings
+    df_merged_picks_standings = pd.merge(
+        df_merged_picks_standings,
+        df_teams[['school', 'id']],
+        left_on='school',
+        right_on='school',
+        how='left'
+    )
+    
+    # Map the latest ranking
+    df_merged_picks_standings['Ranking'] = df_merged_picks_standings['id'].map(team_rank_map)
+    df_merged_picks_standings['school_with_rank'] = df_merged_picks_standings.apply(
+        lambda row: f"{row['school']} ({row['Ranking']})" if pd.notna(row['Ranking']) else row['school'],
+        axis=1
+    )
+    
     return df_leaderboard, df_merged_picks_standings, df_merged_rankings
 
 
