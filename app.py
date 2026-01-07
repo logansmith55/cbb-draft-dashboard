@@ -281,6 +281,11 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 # --- Main Streamlit App Logic ---
 st.title('Metro Sharon CBB Draft Leaderboard')
 
+# Load and process data
+df_picks = load_draft_picks()
+df_teams, df_rankings, df_games = fetch_cbbd_data()
+df_leaderboard, df_merged_picks_standings, df_merged_rankings = process_data(df_picks, df_teams, df_rankings, df_games)
+
 # --- Display latest game date safely ---
 if df_games is not None and isinstance(df_games, pd.DataFrame) and 'startDate' in df_games.columns and not df_games.empty:
     # Convert to datetime safely
@@ -304,16 +309,9 @@ if df_games is not None and isinstance(df_games, pd.DataFrame) and 'startDate' i
 else:
     st.caption("Game data as of: N/A")
 
-
-
 # Display last updated in Central Time
 central_time = datetime.datetime.now(ZoneInfo("America/Chicago"))
 st.caption(f"Last updated: {central_time.strftime('%Y-%m-%d %H:%M %Z')}")
-
-# Load and process data
-df_picks = load_draft_picks()
-df_teams, df_rankings, df_games = fetch_cbbd_data()
-df_leaderboard, df_merged_picks_standings, df_merged_rankings = process_data(df_picks, df_teams, df_rankings, df_games)
 
 # Sort the data by 'Win Percentage' in descending order
 leaderboard_data = df_leaderboard.sort_values(by='Win Percentage', ascending=False).reset_index(drop=True)
