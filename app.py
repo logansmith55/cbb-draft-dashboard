@@ -358,9 +358,13 @@ st.dataframe(filtered_leaderboard)
 st.subheader('Individual Performance')
 for person_name in df_leaderboard['person'].unique():
     with st.expander(f"{person_name}'s Teams"):
-        person_teams_df = df_merged_picks_standings[
-            df_merged_picks_standings['person'] == person_name
-        ][['school', 'Wins', 'Losses', 'Streak', 'Win Percentage']].sort_values(by='Win Percentage', ascending=False)
+       person_teams_df = df_merged_picks_standings[
+        df_merged_picks_standings['person'] == person_name
+    ][['school_with_rank', 'Wins', 'Losses', 'Streak', 'Win Percentage']].sort_values(by='Win Percentage', ascending=False)
+
+# Rename column for display
+person_teams_df = person_teams_df.rename(columns={'school_with_rank': 'school'})
+
 
         avg_win_pct = person_teams_df['Win Percentage'].mean() if not person_teams_df.empty else 0.0
         avg_win_pct = round(avg_win_pct * 100, 2)
