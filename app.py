@@ -282,19 +282,25 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 # --- Main Streamlit App Logic ---
 st.title('Metro Sharon CBB Draft Leaderboard')
 
-# Display last updated in Central Time
-central_time = datetime.datetime.now(ZoneInfo("America/Chicago"))
-st.caption(f"Last updated: {central_time.strftime('%Y-%m-%d %H:%M %Z')}")
+# --- Handle refresh button with session state ---
+if 'refresh' not in st.session_state:
+    st.session_state.refresh = False
 
-# --- Refresh Button ---
 if st.button("Refresh Data"):
-    # Clear caches for all @st.cache_data functions
+    # Mark refresh request in session state
+    st.session_state.refresh = True
+
+# If refresh requested, clear caches and reset flag
+if st.session_state.refresh:
     load_draft_picks.clear()
     fetch_cbbd_data.clear()
     process_data.clear()
+    st.session_state.refresh = False  # reset to prevent loop
+    st.experimental_rerun()           # safe rerun now
     
-    # Rerun the app so it reloads fresh data
-    st.experimental_rerun()  # must be inside the button block
+# Display last updated in Central Time
+central_time = datetime.datetime.now(ZoneInfo("America/Chicago"))
+st.caption(f"Last updated: {central_time.strftime('%Y-%m-%d %H:%M %Z')}")
 
 # Load and process data
 df_picks = load_draft_picks()
