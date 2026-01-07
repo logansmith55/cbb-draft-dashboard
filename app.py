@@ -95,38 +95,38 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     df_standings['Win Percentage'] = df_standings['Wins'] / (df_standings['Wins'] + df_standings['Losses'])
 
     # Streaks
-# 1️⃣ Calculate streaks
-df_games_sorted = df_games.sort_values(by='startDate', ascending=False).reset_index(drop=True)
-team_streaks = {}  # <-- make sure this is defined before using it
-for index, row in df_games_sorted.iterrows():
-    home_team = row['homeTeam']
-    away_team = row['awayTeam']
-    home_points = row['homePoints']
-    away_points = row['awayPoints']
-
-    if home_points is None or away_points is None or home_points == away_points:
-        continue
-
-    if home_points > away_points:
-        winner, loser = home_team, away_team
-    else:
-        winner, loser = away_team, home_team
-
-    if winner not in team_streaks:
-        team_streaks[winner] = 'W1'
-    else:
-        team_streaks[winner] = f"W{int(team_streaks[winner][1:]) + 1}" if team_streaks[winner].startswith('W') else 'W1'
-
-    if loser not in team_streaks:
-        team_streaks[loser] = 'L1'
-    else:
-        team_streaks[loser] = f"L{int(team_streaks[loser][1:]) + 1}" if team_streaks[loser].startswith('L') else 'L1'
-
-# 2️⃣ Map streaks to df_standings
-df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
-
-# 3️⃣ THEN apply emojis
-df_standings['Streak'] = df_standings['Streak'].apply(add_streak_emoji)
+    # 1️⃣ Calculate streaks
+    df_games_sorted = df_games.sort_values(by='startDate', ascending=False).reset_index(drop=True)
+    team_streaks = {}  # <-- make sure this is defined before using it
+    for index, row in df_games_sorted.iterrows():
+        home_team = row['homeTeam']
+        away_team = row['awayTeam']
+        home_points = row['homePoints']
+        away_points = row['awayPoints']
+    
+        if home_points is None or away_points is None or home_points == away_points:
+            continue
+    
+        if home_points > away_points:
+            winner, loser = home_team, away_team
+        else:
+            winner, loser = away_team, home_team
+    
+        if winner not in team_streaks:
+            team_streaks[winner] = 'W1'
+        else:
+            team_streaks[winner] = f"W{int(team_streaks[winner][1:]) + 1}" if team_streaks[winner].startswith('W') else 'W1'
+    
+        if loser not in team_streaks:
+            team_streaks[loser] = 'L1'
+        else:
+            team_streaks[loser] = f"L{int(team_streaks[loser][1:]) + 1}" if team_streaks[loser].startswith('L') else 'L1'
+    
+    # 2️⃣ Map streaks to df_standings
+    df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
+    
+    # 3️⃣ THEN apply emojis
+    df_standings['Streak'] = df_standings['Streak'].apply(add_streak_emoji)
 
 
 
