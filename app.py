@@ -362,8 +362,8 @@ for person_name in df_leaderboard['person'].unique():
         df_merged_picks_standings['person'] == person_name
     ][['school_with_rank', 'Wins', 'Losses', 'Streak', 'Win Percentage']].sort_values(by='Win Percentage', ascending=False)
 
-# Rename column for display
-person_teams_df = person_teams_df.rename(columns={'school_with_rank': 'school'})
+    # Rename column for display
+    person_teams_df = person_teams_df.rename(columns={'school_with_rank': 'school'})
 
 
         avg_win_pct = person_teams_df['Win Percentage'].mean() if not person_teams_df.empty else 0.0
