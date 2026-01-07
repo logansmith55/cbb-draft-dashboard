@@ -3,15 +3,9 @@ import pandas as pd
 import cbbd
 import datetime
 
-# --- Configuration (adapt for Streamlit) ---
-# For secure deployment, store your CBBD_ACCESS_TOKEN in Streamlit secrets or environment variables.
-# Example for Streamlit secrets: CBBD_ACCESS_TOKEN = st.secrets["CBBD_ACCESS_TOKEN"]
-# For local testing, you can directly assign your token here temporarily.
 CBBD_ACCESS_TOKEN = st.secrets["CBBD_ACCESS_TOKEN"]
 configuration = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
 
-# --- Data Fetching and Processing Functions (cached for performance) ---
-# @st.cache_data caches the return value of the function, so it only runs once unless inputs change
 @st.cache_data
 def load_draft_picks():
     columns = ["team_id", "school", "person"]
@@ -33,7 +27,7 @@ def load_draft_picks():
     ]
     return pd.DataFrame(draft, columns=columns)
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def fetch_cbbd_data():
     config = cbbd.Configuration(
         access_token=st.secrets["CBBD_ACCESS_TOKEN"]
