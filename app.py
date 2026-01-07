@@ -279,7 +279,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     return df_leaderboard, df_merged_picks_standings, df_merged_rankings
 
 # --- Main Streamlit App Logic ---
-st.title('CBB Draft Leaderboard')
+st.title('Metro Sharon CBB Draft Leaderboard')
 
 # Load and process data
 df_picks = load_draft_picks()
@@ -304,7 +304,7 @@ st.subheader('Overall Leaderboard')
 st.dataframe(filtered_leaderboard)
 
 # Display individual drafter details
-st.subheader('Individual Drafter Performance')
+st.subheader('Individual Performance')
 for person_name in df_leaderboard['person'].unique():
     with st.expander(f"{person_name}'s Teams"):
         person_teams_df = df_merged_picks_standings[
@@ -326,22 +326,3 @@ for person_name in df_leaderboard['person'].unique():
 
         final_df = pd.concat([person_teams_df, summary_row], ignore_index=True)
         st.dataframe(final_df)
-
-st.write("---")
-st.markdown("""
-**To run this Streamlit app:**
-1.  Save the code above as a Python file (e.g., `app.py`).
-2.  Install dependencies: `pip install streamlit pandas cbbd`
-    *(Note: `PyGithub` was in the original notebook but is not used in this Streamlit app's logic.)*
-3.  Set your `CBBD_ACCESS_TOKEN` securely (e.g., using Streamlit secrets if deploying to Streamlit Cloud, or environment variables).
-    For local testing, you can temporarily replace `"YOUR_CBBD_ACCESS_TOKEN_HERE"` with your actual token.
-4.  Execute `streamlit run app.py` in your terminal.
-
-**Removed Colab/GitHub specific sections:**
-*   `!pip install` commands (moved to instructions).
-*   `google.colab` imports and `drive.mount` (Colab-specific).
-*   `help()` calls (for debugging/inspection).
-*   `.to_csv()` calls to Google Drive paths (Streamlit apps typically don't persist data to local files in this way).
-*   GitHub API interaction for uploading files (sensitive tokens, and generally handled outside the live app logic).
-*   `df.head()` calls (for display/debugging in notebooks, not for final script output).
-""")
