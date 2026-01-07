@@ -12,81 +12,81 @@ configuration = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
 def load_draft_picks():
     columns = ["team_id", "school", "person"]
 
-# Populate the teams with the person who drafted
-draft = [
-    # Doug
-    [252, "Saint Louis", "Doug"],
-    [339, "Virginia", "Doug"],
-    [51, "Cincinnati", "Doug"],
-    [235, "Providence", "Doug"],
-    [118, "Illinois", "Doug"],
-    [87, "Florida", "Doug"],
-    [102, "Gonzaga", "Doug"],
+    draft = [
+        # Doug
+        [252, "Saint Louis", "Doug"],
+        [339, "Virginia", "Doug"],
+        [51, "Cincinnati", "Doug"],
+        [235, "Providence", "Doug"],
+        [118, "Illinois", "Doug"],
+        [87, "Florida", "Doug"],
+        [102, "Gonzaga", "Doug"],
 
-    # Evan
-    [11, "Arizona", "Evan"],
-    [25, "Boise State", "Evan"],
-    [5, "Alabama", "Evan"],
-    [160, "Maryland", "Evan"],
-    [169, "Michigan State", "Evan"],
-    [248, "SMU", "Evan"],
-    [314, "UConn", "Evan"],
+        # Evan
+        [11, "Arizona", "Evan"],
+        [25, "Boise State", "Evan"],
+        [5, "Alabama", "Evan"],
+        [160, "Maryland", "Evan"],
+        [169, "Michigan State", "Evan"],
+        [248, "SMU", "Evan"],
+        [314, "UConn", "Evan"],
 
-    # Jack
-    [72, "Duke", "Jack"],
-    [298, "Texas Tech", "Jack"],
-    [359, "Xavier", "Jack"],
-    [223, "Oregon", "Jack"],
-    [323, "USC", "Jack"],
-    [257, "San Diego State", "Jack"],
-    [12, "Arkansas", "Jack"],
+        # Jack
+        [72, "Duke", "Jack"],
+        [298, "Texas Tech", "Jack"],
+        [359, "Xavier", "Jack"],
+        [223, "Oregon", "Jack"],
+        [323, "USC", "Jack"],
+        [257, "San Diego State", "Jack"],
+        [12, "Arkansas", "Jack"],
 
-    # Logan
-    [20, "Baylor", "Logan"],
-    [61, "Creighton", "Logan"],
-    [124, "Iowa", "Logan"],
-    [150, "Louisville", "Logan"],
-    [163, "Memphis", "Logan"],
-    [170, "Michigan", "Logan"],
-    [177, "Missouri", "Logan"],
+        # Logan
+        [20, "Baylor", "Logan"],
+        [61, "Creighton", "Logan"],
+        [124, "Iowa", "Logan"],
+        [150, "Louisville", "Logan"],
+        [163, "Memphis", "Logan"],
+        [170, "Michigan", "Logan"],
+        [177, "Missouri", "Logan"],
 
-    # Mike
-    [52, "Clemson", "Mike"],
-    [125, "Iowa State", "Mike"],
-    [34, "Butler", "Mike"],
-    [355, "Wisconsin", "Mike"],
-    [329, "Utah State", "Mike"],
-    [135, "Kentucky", "Mike"],
-    [253, "Saint Mary's", "Mike"],
+        # Mike
+        [52, "Clemson", "Mike"],
+        [125, "Iowa State", "Mike"],
+        [34, "Butler", "Mike"],
+        [355, "Wisconsin", "Mike"],
+        [329, "Utah State", "Mike"],
+        [135, "Kentucky", "Mike"],
+        [253, "Saint Mary's", "Mike"],
 
-    # Nico
-    [64, "Dayton", "Nico"],
-    [200, "North Carolina", "Nico"],
-    [113, "Houston", "Nico"],
-    [338, "Villanova", "Nico"],
-    [313, "UCLA", "Nico"],
-    [16, "Auburn", "Nico"],
-    [29, "Bradley", "Nico"],
+        # Nico
+        [64, "Dayton", "Nico"],
+        [200, "North Carolina", "Nico"],
+        [113, "Houston", "Nico"],
+        [338, "Villanova", "Nico"],
+        [313, "UCLA", "Nico"],
+        [16, "Auburn", "Nico"],
+        [29, "Bradley", "Nico"],
 
-    # Nick
-    [333, "VCU", "Nick"],
-    [185, "NC State", "Nick"],
-    [18, "BYU", "Nick"],
-    [279, "St. John's", "Nick"],
-    [121, "Indiana", "Nick"],
-    [216, "Ohio State", "Nick"],
-    [336, "Vanderbilt", "Nick"],
+        # Nick
+        [333, "VCU", "Nick"],
+        [185, "NC State", "Nick"],
+        [18, "BYU", "Nick"],
+        [279, "St. John's", "Nick"],
+        [121, "Indiana", "Nick"],
+        [216, "Ohio State", "Nick"],
+        [336, "Vanderbilt", "Nick"],
 
-    # Sam
-    [342, "Wake Forest", "Sam"],
-    [131, "Kansas", "Sam"],
-    [157, "Marquette", "Sam"],
-    [65, "DePaul", "Sam"],
-    [236, "Purdue", "Sam"],
-    [292, "Tennessee", "Sam"],
-    [220, "Ole Miss", "Sam"],
-]
-return pd.DataFrame(draft, columns=columns)
+        # Sam
+        [342, "Wake Forest", "Sam"],
+        [131, "Kansas", "Sam"],
+        [157, "Marquette", "Sam"],
+        [65, "DePaul", "Sam"],
+        [236, "Purdue", "Sam"],
+        [292, "Tennessee", "Sam"],
+        [220, "Ole Miss", "Sam"],
+    ]
+
+    return pd.DataFrame(draft, columns=columns)
 
 # Get data from cbbd source
 @st.cache_data
