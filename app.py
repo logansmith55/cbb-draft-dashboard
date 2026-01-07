@@ -59,6 +59,23 @@ def fetch_cbbd_data():
 
     return df_teams, df_rankings, df_games
 
+# Function to add emojis to streaks
+def add_streak_emoji(streak):
+    if streak.startswith('W'):
+        num = int(streak[1:])
+        if num >= 3:
+            return f"🔥 {streak}"  # long winning streak
+        else:
+            return streak
+    elif streak.startswith('L'):
+        num = int(streak[1:])
+        if num >= 3:
+            return f"🥶 {streak}"  # long losing streak
+        else:
+            return streak
+    else:
+        return streak
+
 # --- Process data ---
 @st.cache_data(ttl=3600)
 def process_data(df_picks, df_teams, df_rankings, df_games):
@@ -86,7 +103,9 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
         winner, loser = (home, away) if home_pts > away_pts else (away, home)
         streaks[winner] = f"W{int(streaks[winner][1:])+1}" if winner in streaks and streaks[winner].startswith('W') else 'W1'
         streaks[loser] = f"L{int(streaks[loser][1:])+1}" if loser in streaks and streaks[loser].startswith('L') else 'L1'
-    df_standings['Streak'] = df_standings['Team'].map(streaks).fillna('N/A')
+    df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
+    df_standings['Streak'] = df_standings['Streak'].apply(add_streak_emoji)
+
 
     # Next game info
     df_games['startDate'] = pd.to_datetime(df_games['startDate'])
