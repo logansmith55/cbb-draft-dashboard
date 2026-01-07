@@ -281,19 +281,16 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 # --- Main Streamlit App Logic ---
 st.title('Metro Sharon CBB Draft Leaderboard')
 
-from zoneinfo import ZoneInfo
-import datetime
-
-if st.button("Refresh Data"):
-    # Clear cached functions
-    fetch_cbbd_data.clear()
-    process_data.clear()
-    st.experimental_rerun()  # rerun the app
-
 # Display last updated in Central Time
 central_time = datetime.datetime.now(ZoneInfo("America/Chicago"))
 st.caption(f"Last updated: {central_time.strftime('%Y-%m-%d %H:%M %Z')}")
-    
+
+# --- Refresh Button ---
+if st.button("Refresh Data"):
+    fetch_cbbd_data.clear()   # clear API cache
+    process_data.clear()      # clear processing cache
+    st.experimental_rerun()   # safe rerun
+
 # Load and process data
 df_picks = load_draft_picks()
 df_teams, df_rankings, df_games = fetch_cbbd_data()
