@@ -329,21 +329,6 @@ filtered_leaderboard = leaderboard_data[leaderboard_data['person'].isin(selected
 filtered_leaderboard['Win Percentage'] = (filtered_leaderboard['Win Percentage'] * 100).round(2)
 filtered_leaderboard['Win Percentage'] = filtered_leaderboard['Win Percentage'].apply(lambda x: f"{x:.2f}%")
 
-def streak_sort_value(streak):
-    if streak.startswith("W"):
-        return int(streak[1:]) * 1_000 + 1  # large positive
-    elif streak.startswith("L"):
-        return -int(streak[1:]) - 1_000  # large negative
-    else:  # N/A or unknown
-        return 0
-
-# Example usage with your standings dataframe
-df_standings_sorted = df_standings.sort_values(
-    by='Streak', 
-    key=lambda col: col.apply(streak_sort_value), 
-    ascending=False
-)
-
 # Display the filtered and sorted leaderboard
 st.subheader('Overall Leaderboard')
 st.dataframe(filtered_leaderboard)
