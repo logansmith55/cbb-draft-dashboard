@@ -3,48 +3,113 @@ import pandas as pd
 import cbbd
 import datetime
 
+# Access token setup (CBBD_ACCESS_TOKEN is stored in Streamlit settings)
 CBBD_ACCESS_TOKEN = st.secrets["CBBD_ACCESS_TOKEN"]
 configuration = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
 
+# Populate draft picks for mapping
 @st.cache_data
 def load_draft_picks():
     columns = ["team_id", "school", "person"]
-    draft = [
-        [64, "Dayton", "Nico"], [252, "Saint Louis", "Doug"], [333, "VCU", "Nick"], [200, "North Carolina", "Nico"],
-        [72, "Duke", "Jack"], [185, "NC State", "Nick"], [339, "Virginia", "Doug"], [342, "Wake Forest", "Sam"],
-        [52, "Clemson", "Mike"], [150, "Louisville", "Logan"], [248, "SMU", "Evan"], [163, "Memphis", "Logan"],
-        [131, "Kansas", "Sam"], [20, "Baylor", "Logan"], [125, "Iowa State", "Mike"], [298, "Texas Tech", "Jack"],
-        [113, "Houston", "Nico"], [18, "BYU", "Nick"], [51, "Cincinnati", "Doug"], [11, "Arizona", "Evan"],
-        [338, "Villanova", "Nico"], [279, "St. John's", "Nick"], [235, "Providence", "Doug"], [157, "Marquette", "Sam"],
-        [61, "Creighton", "Logan"], [359, "Xavier", "Jack"], [65, "DePaul", "Sam"], [34, "Butler", "Mike"],
-        [236, "Purdue", "Sam"], [121, "Indiana", "Nick"], [118, "Illinois", "Doug"], [216, "Ohio State", "Nick"],
-        [124, "Iowa", "Logan"], [355, "Wisconsin", "Mike"], [170, "Michigan", "Logan"], [169, "Michigan State", "Evan"],
-        [160, "Maryland", "Evan"], [223, "Oregon", "Jack"], [313, "UCLA", "Nico"], [323, "USC", "Jack"],
-        [257, "San Diego State", "Jack"], [25, "Boise State", "Evan"], [329, "Utah State", "Mike"], [135, "Kentucky", "Mike"],
-        [5, "Alabama", "Evan"], [292, "Tennessee", "Sam"], [87, "Florida", "Doug"], [336, "Vanderbilt", "Nick"],
-        [16, "Auburn", "Nico"], [220, "Ole Miss", "Sam"], [12, "Arkansas", "Jack"], [177, "Missouri", "Logan"],
-        [253, "Saint Mary's", "Mike"], [102, "Gonzaga", "Doug"], [314, "UConn", "Evan"], [29, "Bradley", "Nico"]
-    ]
+
+# Populate the teams with the person who drafted
+draft = [
+    # Doug
+    [252, "Saint Louis", "Doug"],
+    [339, "Virginia", "Doug"],
+    [51, "Cincinnati", "Doug"],
+    [235, "Providence", "Doug"],
+    [118, "Illinois", "Doug"],
+    [87, "Florida", "Doug"],
+    [102, "Gonzaga", "Doug"],
+
+    # Evan
+    [11, "Arizona", "Evan"],
+    [25, "Boise State", "Evan"],
+    [5, "Alabama", "Evan"],
+    [160, "Maryland", "Evan"],
+    [169, "Michigan State", "Evan"],
+    [248, "SMU", "Evan"],
+    [314, "UConn", "Evan"],
+
+    # Jack
+    [72, "Duke", "Jack"],
+    [298, "Texas Tech", "Jack"],
+    [359, "Xavier", "Jack"],
+    [223, "Oregon", "Jack"],
+    [323, "USC", "Jack"],
+    [257, "San Diego State", "Jack"],
+    [12, "Arkansas", "Jack"],
+
+    # Logan
+    [20, "Baylor", "Logan"],
+    [61, "Creighton", "Logan"],
+    [124, "Iowa", "Logan"],
+    [150, "Louisville", "Logan"],
+    [163, "Memphis", "Logan"],
+    [170, "Michigan", "Logan"],
+    [177, "Missouri", "Logan"],
+
+    # Mike
+    [52, "Clemson", "Mike"],
+    [125, "Iowa State", "Mike"],
+    [34, "Butler", "Mike"],
+    [355, "Wisconsin", "Mike"],
+    [329, "Utah State", "Mike"],
+    [135, "Kentucky", "Mike"],
+    [253, "Saint Mary's", "Mike"],
+
+    # Nico
+    [64, "Dayton", "Nico"],
+    [200, "North Carolina", "Nico"],
+    [113, "Houston", "Nico"],
+    [338, "Villanova", "Nico"],
+    [313, "UCLA", "Nico"],
+    [16, "Auburn", "Nico"],
+    [29, "Bradley", "Nico"],
+
+    # Nick
+    [333, "VCU", "Nick"],
+    [185, "NC State", "Nick"],
+    [18, "BYU", "Nick"],
+    [279, "St. John's", "Nick"],
+    [121, "Indiana", "Nick"],
+    [216, "Ohio State", "Nick"],
+    [336, "Vanderbilt", "Nick"],
+
+    # Sam
+    [342, "Wake Forest", "Sam"],
+    [131, "Kansas", "Sam"],
+    [157, "Marquette", "Sam"],
+    [65, "DePaul", "Sam"],
+    [236, "Purdue", "Sam"],
+    [292, "Tennessee", "Sam"],
+    [220, "Ole Miss", "Sam"],
+]
     return pd.DataFrame(draft, columns=columns)
 
+# Get data from cbbd source
 @st.cache_data
 def fetch_cbbd_data():
     config = cbbd.Configuration(
-        access_token=st.secrets["CBBD_ACCESS_TOKEN"]
+        access_token=st.secrets["CBBD_ACCESS_TOKEN"] # stored in Streamlit
     )
 
     with cbbd.ApiClient(config) as api_client:
+        # all college basketball teams
         teams_api = cbbd.TeamsApi(api_client)
         teams = teams_api.get_teams()
-        df_teams = pd.DataFrame([team.to_dict() for team in teams])
+        df_teams = pd.DataFrame([team.to_dict() for team in teams]) # final df
 
+        # AP and Coaches poll rankings
         rankings_api = cbbd.RankingsApi(api_client)
         rankings = rankings_api.get_rankings(season=2026)
-        df_rankings = pd.DataFrame([rank.to_dict() for rank in rankings])
+        df_rankings = pd.DataFrame([rank.to_dict() for rank in rankings]) # final df
 
+        # game level data
         games_api = cbbd.api.games_api.GamesApi(api_client)
         games = games_api.get_games(season=2026)
-        df_games = pd.DataFrame([game.to_dict() for game in games])
+        df_games = pd.DataFrame([game.to_dict() for game in games]) # final df
 
     return df_teams, df_rankings, df_games
 
@@ -74,7 +139,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     df_standings = df_standings.reset_index()
 
     # Calculate Win Percentage
-    df_standings['Win Percentage'] = df_standings['Wins'] / (df_standings['Wins'] + df_standings['Losses'])
+    df_standings['Win Percentage'] = df_standings['Wins'] / (df_standings['Wins'] + df_standings['Losses']) # in decimal
 
     # Calculate streaks
     df_games_sorted = df_games.sort_values(by='startDate', ascending=False).reset_index(drop=True)
@@ -110,6 +175,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 
     df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
 
+    # DOES NOT WORK - games data only for past and present games, not future.
     # Get next game info
     df_games['startDate'] = pd.to_datetime(df_games['startDate'])
     current_time = pd.to_datetime(datetime.datetime.now(datetime.timezone.utc))
@@ -241,11 +307,11 @@ st.dataframe(filtered_leaderboard)
 # Display individual drafter details
 st.subheader('Individual Drafter Performance')
 for person_name in df_leaderboard['person'].unique():
-    with st.expander(f"Teams drafted by {person_name}"):
+    with st.expander(f"{person_name}'s Teams"):
         person_teams_df = df_merged_picks_standings[
             df_merged_picks_standings['person'] == person_name
         ][
-            ['school', 'Wins', 'Losses', 'Win Percentage', 'Streak', 'Next Game Opponent', 'Next Game Date']
+            ['school', 'Wins', 'Losses', 'Win Percentage', 'Streak']
         ].sort_values(by='Win Percentage', ascending=False)
 
         # Handle potential division by zero if a person has no games played
@@ -256,9 +322,7 @@ for person_name in df_leaderboard['person'].unique():
             'Wins': person_teams_df['Wins'].sum(),
             'Losses': person_teams_df['Losses'].sum(),
             'Win Percentage': avg_win_pct,
-            'Streak': '',
-            'Next Game Opponent': '',
-            'Next Game Date': ''
+            'Streak': ''
         }])
 
         final_df = pd.concat([person_teams_df, summary_row], ignore_index=True)
