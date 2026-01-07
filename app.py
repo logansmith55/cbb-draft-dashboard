@@ -281,6 +281,11 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 # --- Main Streamlit App Logic ---
 st.title('Metro Sharon CBB Draft Leaderboard')
 
+# Manual refresh button
+if st.button("🔄 Refresh data now"):
+    st.cache_data.clear()
+    st.rerun()
+    
 # Load and process data
 df_picks = load_draft_picks()
 df_teams, df_rankings, df_games = fetch_cbbd_data()
