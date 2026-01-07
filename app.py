@@ -33,8 +33,12 @@ def load_draft_picks():
     ]
     return pd.DataFrame(draft, columns=columns)
 
-@st.cache_data
-def fetch_cbbd_data(config):
+@st.cache_data(ttl=3600)
+def fetch_cbbd_data():
+    config = cbbd.Configuration(
+        access_token=st.secrets["CBBD_ACCESS_TOKEN"]
+    )
+
     with cbbd.ApiClient(config) as api_client:
         teams_api = cbbd.TeamsApi(api_client)
         teams = teams_api.get_teams()
@@ -220,7 +224,7 @@ st.title('CBB Draft Leaderboard')
 
 # Load and process data
 df_picks = load_draft_picks()
-df_teams, df_rankings, df_games = fetch_cbbd_data(configuration)
+df_teams, df_rankings, df_games = fetch_cbbd_data()
 df_leaderboard, df_merged_picks_standings, df_merged_rankings = process_data(df_picks, df_teams, df_rankings, df_games)
 
 # Sort the data by 'Average Win Percentage' in descending order
