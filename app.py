@@ -39,12 +39,12 @@ def load_draft_picks():
         [65, "DePaul", "Sam"], [236, "Purdue", "Sam"], [292, "Tennessee", "Sam"], [220, "Ole Miss", "Sam"]
     ]
     return pd.DataFrame(draft, columns=columns)
-
-# --- Fetch CBB data (only drafted teams) ---
+# --- Fetch CBB data (filter games after fetch) ---
 @st.cache_data(ttl=3600)
 def fetch_cbbd_data():
     config = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
     with cbbd.ApiClient(config) as api_client:
+
         # 1️⃣ Teams
         teams_api = cbbd.TeamsApi(api_client)
         teams = teams_api.get_teams()
@@ -55,27 +55,23 @@ def fetch_cbbd_data():
         rankings = rankings_api.get_rankings(season=2026)
         df_rankings = pd.DataFrame([rank.to_dict() for rank in rankings])
 
-        # 3️⃣ Games (only drafted teams)
-        df_picks = load_draft_picks()
-        draft_team_ids = df_picks['team_id'].tolist()
+        # 3️⃣ Games — fetch all
         games_api_instance = cbbd.api.games_api.GamesApi(api_client)
+        all_games = games_api_instance.get_games(season=2026)
+        df_all_games = pd.DataFrame([game.to_dict() for game in all_games])
 
-        df_games_list = []
-        for team_id in draft_team_ids:
-            try:
-                # Correct method: get games for a single team
-                team_games = games_api_instance.get_games_by_team(team_id=team_id, season=2026)
-                df_team_games = pd.DataFrame([game.to_dict() for game in team_games])
-                df_games_list.append(df_team_games)
-            except Exception as e:
-                st.warning(f"Error fetching games for team_id {team_id}: {e}")
+    # Now filter only games involving drafted teams
+    df_picks = load_draft_picks()
+    draft_ids = df_picks['team_id'].tolist()
 
-        # Combine all games and remove duplicates
-        if df_games_list:
-            df_games = pd.concat(df_games_list, ignore_index=True)
-            df_games.drop_duplicates(subset='id', inplace=True)
-        else:
-            df_games = pd.DataFrame()  # empty fallback
+    # Filter matches where either home or away matches a draft team
+    df_games = df_all_games[
+        (df_all_games['homeTeamId'].isin(draft_ids)) |
+        (df_all_games['awayTeamId'].isin(draft_ids))
+    ].copy()
+
+    # Remove duplicates if needed
+    df_games.drop_duplicates(subset='id', inplace=True)
 
     return df_teams, df_rankings, df_games
 
