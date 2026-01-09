@@ -1,270 +1,188 @@
 import streamlit as st
 import pandas as pd
 import requests
-import datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
-# --- Secrets ---
+# =======================
+# CONFIG
+# =======================
 API_KEY = st.secrets["CBBD_ACCESS_TOKEN"]
-BASE_URL_GAMES = "https://api.collegebasketballdata.com/games"
-BASE_URL_TEAMS = "https://api.collegebasketballdata.com/teams"
-BASE_URL_RANKINGS = "https://api.collegebasketballdata.com/rankings"
+HEADERS = {"Authorization": f"Bearer {API_KEY}"}
+CT = ZoneInfo("America/Chicago")
 
-# --- Draft picks ---
+st.set_page_config(page_title="Metro Sharon CBB Draft Leaderboard", layout="wide")
+
+# =======================
+# DRAFT PICKS
+# =======================
 @st.cache_data(ttl=3600)
 def load_draft_picks():
-    columns = ["team_id", "school", "person"]
-    draft = [
+    return pd.DataFrame([
         # Doug
-        [252, "Saint Louis", "Doug"], [339, "Virginia", "Doug"], [51, "Cincinnati", "Doug"],
-        [235, "Providence", "Doug"], [118, "Illinois", "Doug"], [87, "Florida", "Doug"], [102, "Gonzaga", "Doug"],
+        [252,"Saint Louis","Doug"],[339,"Virginia","Doug"],[51,"Cincinnati","Doug"],
+        [235,"Providence","Doug"],[118,"Illinois","Doug"],[87,"Florida","Doug"],[102,"Gonzaga","Doug"],
         # Evan
-        [11, "Arizona", "Evan"], [25, "Boise State", "Evan"], [5, "Alabama", "Evan"],
-        [160, "Maryland", "Evan"], [169, "Michigan State", "Evan"], [248, "SMU", "Evan"], [314, "UConn", "Evan"],
+        [11,"Arizona","Evan"],[25,"Boise State","Evan"],[5,"Alabama","Evan"],
+        [160,"Maryland","Evan"],[169,"Michigan State","Evan"],[248,"SMU","Evan"],[314,"UConn","Evan"],
         # Jack
-        [72, "Duke", "Jack"], [298, "Texas Tech", "Jack"], [359, "Xavier", "Jack"],
-        [223, "Oregon", "Jack"], [323, "USC", "Jack"], [257, "San Diego State", "Jack"], [12, "Arkansas", "Jack"],
+        [72,"Duke","Jack"],[298,"Texas Tech","Jack"],[359,"Xavier","Jack"],
+        [223,"Oregon","Jack"],[323,"USC","Jack"],[257,"San Diego State","Jack"],[12,"Arkansas","Jack"],
         # Logan
-        [20, "Baylor", "Logan"], [61, "Creighton", "Logan"], [124, "Iowa", "Logan"],
-        [150, "Louisville", "Logan"], [163, "Memphis", "Logan"], [170, "Michigan", "Logan"], [177, "Missouri", "Logan"],
+        [20,"Baylor","Logan"],[61,"Creighton","Logan"],[124,"Iowa","Logan"],
+        [150,"Louisville","Logan"],[163,"Memphis","Logan"],[170,"Michigan","Logan"],[177,"Missouri","Logan"],
         # Mike
-        [52, "Clemson", "Mike"], [125, "Iowa State", "Mike"], [34, "Butler", "Mike"],
-        [355, "Wisconsin", "Mike"], [329, "Utah State", "Mike"], [135, "Kentucky", "Mike"], [253, "Saint Mary's", "Mike"],
+        [52,"Clemson","Mike"],[125,"Iowa State","Mike"],[34,"Butler","Mike"],
+        [355,"Wisconsin","Mike"],[329,"Utah State","Mike"],[135,"Kentucky","Mike"],[253,"Saint Mary's","Mike"],
         # Nico
-        [64, "Dayton", "Nico"], [200, "North Carolina", "Nico"], [113, "Houston", "Nico"],
-        [338, "Villanova", "Nico"], [313, "UCLA", "Nico"], [16, "Auburn", "Nico"], [29, "Bradley", "Nico"],
+        [64,"Dayton","Nico"],[200,"North Carolina","Nico"],[113,"Houston","Nico"],
+        [338,"Villanova","Nico"],[313,"UCLA","Nico"],[16,"Auburn","Nico"],[29,"Bradley","Nico"],
         # Nick
-        [333, "VCU", "Nick"], [185, "NC State", "Nick"], [18, "BYU", "Nick"],
-        [279, "St. John's", "Nick"], [121, "Indiana", "Nick"], [216, "Ohio State", "Nick"], [336, "Vanderbilt", "Nick"],
+        [333,"VCU","Nick"],[185,"NC State","Nick"],[18,"BYU","Nick"],
+        [279,"St. John's","Nick"],[121,"Indiana","Nick"],[216,"Ohio State","Nick"],[336,"Vanderbilt","Nick"],
         # Sam
-        [342, "Wake Forest", "Sam"], [131, "Kansas", "Sam"], [157, "Marquette", "Sam"],
-        [65, "DePaul", "Sam"], [236, "Purdue", "Sam"], [292, "Tennessee", "Sam"], [220, "Ole Miss", "Sam"]
-    ]
-    return pd.DataFrame(draft, columns=columns)
+        [342,"Wake Forest","Sam"],[131,"Kansas","Sam"],[157,"Marquette","Sam"],
+        [65,"DePaul","Sam"],[236,"Purdue","Sam"],[292,"Tennessee","Sam"],[220,"Ole Miss","Sam"]
+    ], columns=["team_id","school","person"])
 
-# --- Helper to add streak emojis ---
-def add_streak_emoji(streak):
-    if streak.startswith('W'):
-        num = int(streak[1:])
-        return f"{streak}🔥" if num >= 3 else streak
-    elif streak.startswith('L'):
-        num = int(streak[1:])
-        return f"{streak}🥶" if num >= 3 else streak
-    else:
-        return streak
-
-# --- Fetch teams ---
+# =======================
+# API FETCH
+# =======================
 @st.cache_data(ttl=3600)
-def fetch_teams():
-    headers = {"Authorization": f"Bearer {API_KEY}"}
-    response = requests.get(BASE_URL_TEAMS, headers=headers)
-    response.raise_for_status()
-    return pd.DataFrame(response.json())
+def fetch_games(draft_df):
+    games = []
+    for team in draft_df["school"].unique():
+        r = requests.get(
+            "https://api.collegebasketballdata.com/games",
+            headers=HEADERS,
+            params={
+                "season": 2026,
+                "team": team,
+                "startDateRange": "2025-11-01",
+                "endDateRange": "2026-12-31"
+            }
+        )
+        if r.status_code == 200:
+            games.extend(r.json())
 
-# --- Fetch rankings ---
+    df = pd.DataFrame(games).drop_duplicates("id")
+    df["startDate"] = pd.to_datetime(df["startDate"], utc=True).dt.tz_convert(CT)
+    return df
+
+# =======================
+# PROCESS DATA
+# =======================
 @st.cache_data(ttl=3600)
-def fetch_rankings():
-    headers = {"Authorization": f"Bearer {API_KEY}"}
-    response = requests.get(BASE_URL_RANKINGS, headers=headers, params={"season": 2026})
-    response.raise_for_status()
-    return pd.DataFrame(response.json())
+def process_data(picks, games):
+    records = {}
 
-# --- Fetch games ---
-@st.cache_data(ttl=3600)
-def fetch_games():
-    df_picks = load_draft_picks()
-    draft_teams = df_picks["school"].unique()
-    headers = {"Authorization": f"Bearer {API_KEY}"}
-    all_games = []
-
-    for team in draft_teams:
-        params = {
-            "season": 2026,
-            "team": team,
-            "startDateRange": "2025-11-01",
-            "endDateRange": "2026-12-31"
-        }
-        response = requests.get(BASE_URL_GAMES, headers=headers, params=params)
-        if response.status_code == 200:
-            all_games.extend(response.json())
-        else:
-            st.warning(f"Error fetching games for {team}: {response.text}")
-
-    df_games = pd.DataFrame(all_games).drop_duplicates(subset="id")
-
-    # --- FIX timezone: parse as UTC, then convert to Central
-    if not df_games.empty:
-        df_games['startDate'] = pd.to_datetime(df_games['startDate'], utc=True).dt.tz_convert(ZoneInfo('America/Chicago'))
-
-    return df_games
-
-# --- Process Data ---
-@st.cache_data(ttl=3600)
-def process_data(df_picks, df_teams, df_rankings, df_games):
-    # --- Team records ---
-    team_records = {}
-    for _, row in df_games.iterrows():
-        home, away, home_pts, away_pts = row['homeTeam'], row['awayTeam'], row['homePoints'], row['awayPoints']
-        if home not in team_records: team_records[home] = {"Wins": 0, "Losses": 0}
-        if away not in team_records: team_records[away] = {"Wins": 0, "Losses": 0}
-        if pd.notna(home_pts) and pd.notna(away_pts):
-            if home_pts > away_pts:
-                team_records[home]["Wins"] += 1
-                team_records[away]["Losses"] += 1
-            elif away_pts > home_pts:
-                team_records[away]["Wins"] += 1
-                team_records[home]["Losses"] += 1
-
-    df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index': 'Team'})
-    # --- Correct rounding like Google Sheets ---
-    df_standings['Win Percentage'] = df_standings.apply(
-        lambda row: round((row['Wins'] / (row['Wins'] + row['Losses']))*10000)/100, axis=1
-    ) / 100  # keeps two decimals
-
-    # --- Streaks ---
-    df_games_sorted = df_games.sort_values('startDate', ascending=True)
-    team_streaks = {}
-    for _, row in df_games_sorted.iterrows():
-        home_team, away_team = row['homeTeam'], row['awayTeam']
-        home_pts, away_pts = row['homePoints'], row['awayPoints']
-        if home_pts is None or away_pts is None or home_pts == away_pts:
+    for _, g in games.iterrows():
+        if pd.isna(g.homePoints) or pd.isna(g.awayPoints):
             continue
 
-        winner, loser = (home_team, away_team) if home_pts > away_pts else (away_team, home_team)
+        for t in [g.homeTeam, g.awayTeam]:
+            records.setdefault(t, {"Wins":0,"Losses":0})
 
-        team_streaks[winner] = f"W{int(team_streaks.get(winner, 'W0')[1:]) + 1}" if team_streaks.get(winner, '').startswith('W') else "W1"
-        team_streaks[loser] = f"L{int(team_streaks.get(loser, 'L0')[1:]) + 1}" if team_streaks.get(loser, '').startswith('L') else "L1"
+        if g.homePoints > g.awayPoints:
+            records[g.homeTeam]["Wins"] += 1
+            records[g.awayTeam]["Losses"] += 1
+        else:
+            records[g.awayTeam]["Wins"] += 1
+            records[g.homeTeam]["Losses"] += 1
 
-    df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
-    df_standings['Streak'] = df_standings['Streak'].apply(add_streak_emoji)
+    standings = pd.DataFrame(records).T.reset_index().rename(columns={"index":"Team"})
+    standings["Games"] = standings["Wins"] + standings["Losses"]
 
-    # --- Next game ---
-    now = pd.to_datetime(datetime.datetime.now(datetime.timezone.utc)).tz_convert(ZoneInfo("America/Chicago"))
-    df_future_games = df_games[df_games['startDate'] > now]
-    next_game_info = {}
-    for team in df_standings['Team']:
-        future_games = df_future_games[(df_future_games['homeTeam']==team) | (df_future_games['awayTeam']==team)]
-        if not future_games.empty:
-            next_game = future_games.sort_values('startDate').iloc[0]
-            opponent = next_game['awayTeam'] if next_game['homeTeam']==team else next_game['homeTeam']
-            next_game_info[team] = {"opponent": opponent, "date": next_game['startDate'].strftime("%Y-%m-%d %I:%M %p")}
-    df_standings['Next Game Opponent'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('opponent', 'N/A'))
-    df_standings['Next Game Date'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('date', 'N/A'))
+    # 🔒 ZERO-SAFE WIN %
+    standings["Win Percentage"] = (
+        standings["Wins"] / standings["Games"]
+    ).fillna(0)
 
-    # --- Merge picks ---
-    df_merged = pd.merge(df_picks, df_standings, left_on='school', right_on='Team', how='left')
+    # Google Sheets rounding
+    standings["Win Percentage"] = (standings["Win Percentage"] * 10000).round() / 10000
 
-    # --- Leaderboard ---
-    df_leaderboard = df_merged.groupby('person')['Win Percentage'].mean().reset_index()
-    stats = df_merged.groupby('person')[['Wins','Losses']].sum().reset_index()
-    stats['Total Games Played'] = stats['Wins'] + stats['Losses']
-    df_leaderboard = pd.merge(df_leaderboard, stats, on='person', how='left')
-    df_leaderboard = df_leaderboard[['person','Wins','Losses','Total Games Played','Win Percentage']]
+    merged = picks.merge(standings, left_on="school", right_on="Team", how="left")
+    merged[["Wins","Losses","Games","Win Percentage"]] = merged[
+        ["Wins","Losses","Games","Win Percentage"]
+    ].fillna(0)
 
-    # --- Latest ranking ---
-    latest_rankings = df_rankings.sort_values('pollDate').drop_duplicates('teamId', keep='last')
-    team_rank_map = dict(zip(latest_rankings['teamId'], latest_rankings['ranking']))
-    df_merged = pd.merge(df_merged, df_teams[['school','id']], left_on='school', right_on='school', how='left')
-    df_merged['Ranking'] = df_merged['id'].map(team_rank_map)
-    df_merged['school_with_rank'] = df_merged.apply(
-        lambda row: f"{row['school']} ({int(row['Ranking'])})" if pd.notna(row['Ranking']) else row['school'], axis=1
+    leaderboard = (
+        merged.groupby("person")[["Wins","Losses","Games"]]
+        .sum()
+        .reset_index()
     )
+    leaderboard["Win Percentage"] = (
+        leaderboard["Wins"] / leaderboard["Games"]
+    ).fillna(0)
 
-    return df_leaderboard, df_merged
+    leaderboard["Win Percentage"] = (leaderboard["Win Percentage"] * 10000).round() / 10000
 
-# --- Streamlit App ---
+    return leaderboard, merged
+
+# =======================
+# APP
+# =======================
 st.title("Metro Sharon CBB Draft Leaderboard")
 
-# --- Load data ---
-df_picks = load_draft_picks()
-df_teams = fetch_teams()
-df_rankings = fetch_rankings()
-df_games = fetch_games()
-df_leaderboard, df_merged = process_data(df_picks, df_teams, df_rankings, df_games)
+picks = load_draft_picks()
+games = fetch_games(picks)
+leaderboard, merged = process_data(picks, games)
 
-st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %I:%M %p %Z')}")
+st.caption(f"Last updated: {datetime.now(CT).strftime('%Y-%m-%d %I:%M %p CT')}")
 
-# --- Overall Leaderboard ---
-leaderboard_data = df_leaderboard.sort_values('Win Percentage', ascending=False).reset_index(drop=True)
-leaderboard_data['Win Percentage'] = leaderboard_data['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
+# =======================
+# OVERALL LEADERBOARD
+# =======================
 st.subheader("Overall Leaderboard")
-st.dataframe(leaderboard_data)
+lb = leaderboard.sort_values("Win Percentage", ascending=False).copy()
+lb["Win Percentage"] = (lb["Win Percentage"] * 100).map("{:.2f}%".format)
+st.dataframe(lb, use_container_width=True)
 
-# --- Individual performance ---
+# =======================
+# INDIVIDUAL LEADERBOARDS
+# =======================
 st.subheader("Individual Performance")
-for person in df_leaderboard['person'].unique():
-    with st.expander(f"{person}'s Teams"):
-        person_df = df_merged[df_merged['person']==person][
-            ['school_with_rank','Wins','Losses','Streak','Win Percentage']
-        ].sort_values('Win Percentage', ascending=False)
-        person_df = person_df.rename(columns={'school_with_rank':'school'})
-        avg_win_pct = round(person_df['Win Percentage'].mean()*100,2) if not person_df.empty else 0
-        person_df['Win Percentage'] = person_df['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
-        summary = pd.DataFrame([{
-            'school':'Total',
-            'Wins': person_df['Wins'].sum(),
-            'Losses': person_df['Losses'].sum(),
-            'Streak':'',
-            'Win Percentage': f"{avg_win_pct:.2f}%"
-        }])
-        st.dataframe(pd.concat([person_df, summary], ignore_index=True))
 
-# --- Daily Scoreboard ---
+for person in lb["person"]:
+    with st.expander(person):
+        df = merged[merged.person == person].copy()
+        df["Win Percentage"] = (df["Win Percentage"] * 100).map("{:.2f}%".format)
+        st.dataframe(
+            df[["school","Wins","Losses","Games","Win Percentage"]]
+            .sort_values("Win Percentage", ascending=False),
+            use_container_width=True
+        )
+
+# =======================
+# DAILY SCOREBOARD
+# =======================
 st.subheader("Daily Scoreboard")
 
-# Select date and people filter
-today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
-selected_date = st.date_input("Select Date", value=today)
-people_options = ['All'] + df_leaderboard['person'].tolist()
-selected_persons = st.multiselect("Select Person(s)", options=people_options, default='All')
-if 'All' in selected_persons or not selected_persons:
-    selected_persons = df_leaderboard['person'].tolist()
+date = st.date_input("Select date", datetime.now(CT).date())
+owners = dict(zip(picks.school, picks.person))
 
-# Filter games by date and people
-df_games_day = df_games[df_games['startDate'].dt.date == selected_date]
+day = games[games.startDate.dt.date == date].copy()
+day["homeOwner"] = day.homeTeam.map(owners)
+day["awayOwner"] = day.awayTeam.map(owners)
 
-# Merge who owns each team
-team_owner_map = dict(zip(df_merged['school'], df_merged['person']))
-df_games_day['homeOwner'] = df_games_day['homeTeam'].map(team_owner_map)
-df_games_day['awayOwner'] = df_games_day['awayTeam'].map(team_owner_map)
+def format_table(df):
+    df["Time"] = df.startDate.dt.strftime("%I:%M %p")
+    df["Home"] = df.homeTeam + " (" + df.homeOwner.fillna("") + ")"
+    df["Away"] = df.awayTeam + " (" + df.awayOwner.fillna("") + ")"
+    return df[["Time","Home","homePoints","Away","awayPoints"]]
 
-# Big Games: both teams belong to someone
-df_big_games = df_games_day[(df_games_day['homeOwner'].notna()) & (df_games_day['awayOwner'].notna()) & (df_games_day['homeOwner'] != df_games_day['awayOwner'])]
-
-# Show Big Games first
-if not df_big_games.empty:
+# Big Games
+big = day[day.homeOwner.notna() & day.awayOwner.notna() & (day.homeOwner != day.awayOwner)]
+if not big.empty:
     st.markdown("### Big Games")
-    df_bg_display = df_big_games.copy()
-    df_bg_display['Home Score'] = df_bg_display['homePoints']
-    df_bg_display['Away Score'] = df_bg_display['awayPoints']
-    df_bg_display['Time'] = df_bg_display['startDate'].dt.strftime("%I:%M %p")
-    df_bg_display['Home'] = df_bg_display.apply(lambda r: f"{r['homeTeam']} ({r['homeOwner']})" if pd.notna(r['homeOwner']) else r['homeTeam'], axis=1)
-    df_bg_display['Away'] = df_bg_display.apply(lambda r: f"{r['awayTeam']} ({r['awayOwner']})" if pd.notna(r['awayOwner']) else r['awayTeam'], axis=1)
-    df_bg_display = df_bg_display[['Time','Home','Home Score','Away','Away Score']]
-    def highlight_winner(row):
-        style = []
-        if row['Home Score'] > row['Away Score']:
-            style = ['background-color:#d4fcd4','']*3
-        else:
-            style = ['','background-color:#fcd4d4']*3
-        return style
-    st.dataframe(df_bg_display.style.apply(lambda x: ['background-color:#d4fcd4' if x['Home Score']>x['Away Score'] else 'background-color:#fcd4d4' for _ in x], axis=1))
+    st.dataframe(format_table(big), use_container_width=True)
 
-# Show individual persons' games
-for person in selected_persons:
-    st.markdown(f"### {person}'s Teams")
-    person_teams = df_merged[df_merged['person']==person]['school'].tolist()
-    df_person_games = df_games_day[
-        (df_games_day['homeTeam'].isin(person_teams)) | (df_games_day['awayTeam'].isin(person_teams))
-    ].copy()
-    if df_person_games.empty:
-        st.write("No games today.")
-        continue
-    df_person_display = df_person_games.copy()
-    df_person_display['Home Score'] = df_person_display['homePoints']
-    df_person_display['Away Score'] = df_person_display['awayPoints']
-    df_person_display['Time'] = df_person_display['startDate'].dt.strftime("%I:%M %p")
-    df_person_display['Home'] = df_person_display.apply(lambda r: f"{r['homeTeam']} ({r['homeOwner']})" if pd.notna(r['homeOwner']) else r['homeTeam'], axis=1)
-    df_person_display['Away'] = df_person_display.apply(lambda r: f"{r['awayTeam']} ({r['awayOwner']})" if pd.notna(r['awayOwner']) else r['awayTeam'], axis=1)
-    df_person_display = df_person_display[['Time','Home','Home Score','Away','Away Score']]
-    st.dataframe(df_person_display.style.apply(lambda x: ['background-color:#d4fcd4' if x['Home Score']>x['Away Score'] else 'background-color:#fcd4d4' for _ in x], axis=1))
+# Per Person
+for person in picks.person.unique():
+    teams = picks[picks.person == person].school.tolist()
+    person_games = day[
+        day.homeTeam.isin(teams) | day.awayTeam.isin(teams)
+    ]
+    if not person_games.empty:
+        st.markdown(f"### {person}")
+        st.dataframe(format_table(person_games), use_container_width=True)
