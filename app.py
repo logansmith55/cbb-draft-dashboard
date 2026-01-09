@@ -146,8 +146,45 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
 st.title("Metro Sharon CBB Draft Dashboard")
 tab1, tab2 = st.tabs(["Leaderboard", "Daily Scoreboard"])
 
-# --- Leaderboard code omitted here, same as previous working version ---
-# You would include your existing leaderboard code here (unchanged)
+st.title("Metro Sharon CBB Draft Dashboard")
+tab1, tab2 = st.tabs(["Leaderboard", "Daily Scoreboard"])
+
+# --- TAB 1: Leaderboard ---
+with tab1:
+    # Your **existing leaderboard code** goes here.
+    # For example:
+    df_picks = load_draft_picks()
+    df_teams = fetch_teams()
+    df_rankings = fetch_rankings()
+    df_games = fetch_games()
+    df_leaderboard, df_merged = process_data(df_picks, df_teams, df_rankings, df_games)
+
+    st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M %Z')}")
+
+    leaderboard_data = df_leaderboard.sort_values('Win Percentage', ascending=False).reset_index(drop=True)
+    leaderboard_data['Win Percentage'] = leaderboard_data['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
+    st.subheader("Overall Leaderboard")
+    st.dataframe(leaderboard_data)
+
+    # Individual performance
+    st.subheader("Individual Performance")
+    for person in df_leaderboard['person'].unique():
+        with st.expander(f"{person}'s Teams"):
+            person_df = df_merged[df_merged['person']==person][
+                ['school_with_rank','Wins','Losses','Streak','Win Percentage']
+            ].sort_values('Win Percentage', ascending=False)
+            person_df = person_df.rename(columns={'school_with_rank':'school'})
+            avg_win_pct = person_df['Win Percentage'].mean() if not person_df.empty else 0
+            avg_win_pct = round(avg_win_pct*100,2)
+            person_df['Win Percentage'] = person_df['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
+            summary = pd.DataFrame([{
+                'school':'Total',
+                'Wins': person_df['Wins'].sum(),
+                'Losses': person_df['Losses'].sum(),
+                'Streak':'',
+                'Win Percentage': f"{avg_win_pct:.2f}%"
+            }])
+            st.dataframe(pd.concat([person_df, summary], ignore_index=True))
 
 # --- TAB 2: Daily Scoreboard ---
 with tab2:
