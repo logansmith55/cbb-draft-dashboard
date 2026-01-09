@@ -62,16 +62,19 @@ def format_win_pct(wins, losses):
     return f"{pct}%"
 
 def format_game_time(dt):
-    # dt is already Central time
     return dt.strftime("%-I:%M %p")  # 12-hour with AM/PM
 
 def winner_emoji(home_pts, away_pts, team):
     if pd.isna(home_pts) or pd.isna(away_pts):
         return ""
-    if home_pts > away_pts and team == "home":
-        return " ✅"
-    elif away_pts > home_pts and team == "away":
-        return " ✅"
+    if home_pts > away_pts and team=="home":
+        return " 🔥"
+    elif away_pts > home_pts and team=="away":
+        return " 🔥"
+    elif home_pts < away_pts and team=="home":
+        return " 🥶"
+    elif away_pts < home_pts and team=="away":
+        return " 🥶"
     else:
         return ""
 
@@ -117,7 +120,6 @@ def fetch_games():
 # --- Process leaderboard ---
 @st.cache_data(ttl=3600)
 def process_data(df_picks, df_teams, df_rankings, df_games):
-    # Team records
     team_records = {}
     for _, row in df_games.iterrows():
         home, away, home_pts, away_pts = row['homeTeam'], row['awayTeam'], row['homePoints'], row['awayPoints']
@@ -125,76 +127,67 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
         if away not in team_records: team_records[away] = {"Wins": 0, "Losses": 0}
         if pd.notna(home_pts) and pd.notna(away_pts):
             if home_pts > away_pts:
-                team_records[home]["Wins"] += 1
-                team_records[away]["Losses"] += 1
+                team_records[home]["Wins"] +=1
+                team_records[away]["Losses"] +=1
             elif away_pts > home_pts:
-                team_records[away]["Wins"] += 1
-                team_records[home]["Losses"] += 1
+                team_records[away]["Wins"] +=1
+                team_records[home]["Losses"] +=1
 
-    df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index': 'Team'})
-    df_standings['Win Percentage'] = df_standings.apply(
-        lambda row: Decimal(row['Wins']) / Decimal(row['Wins'] + row['Losses']) if (row['Wins']+row['Losses'])>0 else Decimal(0), axis=1
-    )
+    df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index':'Team'})
+    df_standings['Win Percentage'] = df_standings.apply(lambda r: Decimal(r['Wins'])/Decimal(r['Wins']+r['Losses']) if (r['Wins']+r['Losses'])>0 else Decimal(0), axis=1)
 
     # Streaks
-    df_games_sorted = df_games.sort_values('startDate', ascending=True)
+    df_games_sorted = df_games.sort_values('startDate')
     team_streaks = {}
     for _, row in df_games_sorted.iterrows():
-        home_team, away_team = row['homeTeam'], row['awayTeam']
-        home_pts, away_pts = row['homePoints'], row['awayPoints']
-        if home_pts is None or away_pts is None or home_pts==away_pts:
+        home, away, home_pts, away_pts = row['homeTeam'], row['awayTeam'], row['homePoints'], row['awayPoints']
+        if pd.isna(home_pts) or pd.isna(away_pts) or home_pts==away_pts:
             continue
-        winner, loser = (home_team, away_team) if home_pts>away_pts else (away_team, home_team)
+        winner, loser = (home, away) if home_pts>away_pts else (away, home)
         team_streaks[winner] = f"W{int(team_streaks[winner][1:])+1}" if winner in team_streaks and team_streaks[winner].startswith('W') else "W1"
         team_streaks[loser] = f"L{int(team_streaks[loser][1:])+1}" if loser in team_streaks and team_streaks[loser].startswith('L') else "L1"
 
-    df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
-    df_standings['Streak'] = df_standings['Streak'].apply(add_streak_emoji)
+    df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A').apply(add_streak_emoji)
 
     # Next game
     now = pd.to_datetime(datetime.datetime.now(ZoneInfo('America/Chicago')))
-    df_future_games = df_games[df_games['startDate'] > now]
+    df_future = df_games[df_games['startDate']>now]
     next_game_info = {}
     for team in df_standings['Team']:
-        future_games = df_future_games[(df_future_games['homeTeam']==team) | (df_future_games['awayTeam']==team)]
+        future_games = df_future[(df_future['homeTeam']==team)|(df_future['awayTeam']==team)]
         if not future_games.empty:
             next_game = future_games.sort_values('startDate').iloc[0]
             opponent = next_game['awayTeam'] if next_game['homeTeam']==team else next_game['homeTeam']
-            next_game_info[team] = {"opponent": opponent, "date": next_game['startDate'].strftime("%Y-%m-%d %I:%M %p")}
-    df_standings['Next Game Opponent'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('opponent','N/A'))
-    df_standings['Next Game Date'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('date','N/A'))
+            next_game_info[team] = {"opponent":opponent,"date":next_game['startDate'].strftime("%Y-%m-%d %I:%M %p")}
 
-    # Merge picks
+    df_standings['Next Game Opponent'] = df_standings['Team'].map(lambda x: next_game_info.get(x,{}).get('opponent','N/A'))
+    df_standings['Next Game Date'] = df_standings['Team'].map(lambda x: next_game_info.get(x,{}).get('date','N/A'))
+
     df_merged = pd.merge(df_picks, df_standings, left_on='school', right_on='Team', how='left')
 
     # Individual leaderboard
-    df_leaderboard = df_merged.groupby('person').agg({
-        'Wins':'sum',
-        'Losses':'sum',
-    }).reset_index()
+    df_leaderboard = df_merged.groupby('person').agg({'Wins':'sum','Losses':'sum'}).reset_index()
     df_leaderboard['Total Games Played'] = df_leaderboard['Wins'] + df_leaderboard['Losses']
     df_leaderboard['Win Percentage'] = df_leaderboard.apply(lambda r: format_win_pct(r['Wins'], r['Losses']), axis=1)
 
     # Latest ranking
-    latest_rankings = df_rankings.sort_values('pollDate').drop_duplicates('teamId', keep='last')
-    team_rank_map = dict(zip(latest_rankings['teamId'], latest_rankings['ranking']))
+    latest_rankings = df_rankings.sort_values('pollDate').drop_duplicates('teamId',keep='last')
+    team_rank_map = dict(zip(latest_rankings['teamId'],latest_rankings['ranking']))
     df_merged = pd.merge(df_merged, df_teams[['school','id']], left_on='school', right_on='school', how='left')
     df_merged['Ranking'] = df_merged['id'].map(team_rank_map)
-    df_merged['school_with_rank'] = df_merged.apply(
-        lambda row: f"{row['school']} ({int(row['Ranking'])})" if pd.notna(row['Ranking']) else row['school'], axis=1
-    )
+    df_merged['school_with_rank'] = df_merged.apply(lambda r: f"{r['school']} ({int(r['Ranking'])})" if pd.notna(r['Ranking']) else r['school'], axis=1)
 
     return df_leaderboard, df_merged
 
-# --- Daily scoreboard ---
+# --- Daily scoreboard with winner highlight ---
 def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_persons):
     df_games['startDate'] = pd.to_datetime(df_games['startDate']).dt.tz_convert(ZoneInfo('America/Chicago'))
-    date_games = df_games[df_games['startDate'].dt.date == selected_date]
-    df_picks_filtered = df_picks[df_picks['person'].isin(selected_persons)]
-    team_person_map = dict(zip(df_picks_filtered['school'], df_picks_filtered['person']))
+    date_games = df_games[df_games['startDate'].dt.date==selected_date]
+    team_person_map = dict(zip(df_picks['school'], df_picks['person']))
 
-    # Prepare Big Games and Individual games
-    big_games, individual_games = [], {person: [] for person in selected_persons}
+    big_games = []
+    individual_games = {person: [] for person in selected_persons}
+
     for _, row in date_games.iterrows():
         home, away = row['homeTeam'], row['awayTeam']
         home_pts, away_pts = row['homePoints'], row['awayPoints']
@@ -202,46 +195,56 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
         away_person = team_person_map.get(away)
 
         game_info = {
-            "Home Team": home,
-            "Home Score": home_pts if pd.notna(home_pts) else "",
-            "Home Person": home_person if home_person else "",
-            "Away Team": away,
-            "Away Score": away_pts if pd.notna(away_pts) else "",
-            "Away Person": away_person if away_person else "",
+            "Home Team": home, "Home Score": home_pts, "Home Person": home_person,
+            "Away Team": away, "Away Score": away_pts, "Away Person": away_person,
             "Time": format_game_time(row['startDate'])
         }
 
         if home_person and away_person:
             big_games.append(game_info)
-
         for person in selected_persons:
-            if (home_person==person or away_person==person):
+            if home_person==person or away_person==person:
                 individual_games[person].append(game_info)
+
+    def style_winner(df):
+        def highlight(row):
+            home_pts = row['Home Score']
+            away_pts = row['Away Score']
+            style = ['']*len(row)
+            if pd.notna(home_pts) and pd.notna(away_pts):
+                if home_pts>away_pts:
+                    style[0] = 'background-color: #d4edda'  # green for winner
+                    style[1] = 'background-color: #d4edda'
+                elif away_pts>home_pts:
+                    style[2] = 'background-color: #d4edda'
+                    style[3] = 'background-color: #d4edda'
+            return style
+        return df.style.apply(highlight, axis=1)
 
     # Big Games table
     if big_games:
         st.subheader("Big Games")
         big_df = pd.DataFrame([{
-            "Home Team": f"{g['Home Team']} ({g['Home Person']}){winner_emoji(g['Home Score'], g['Away Score'], 'home')}",
+            "Home Team": f"{g['Home Team']} ({g['Home Person']}){winner_emoji(g['Home Score'], g['Away Score'],'home')}",
             "Home Score": g["Home Score"],
-            "Away Team": f"{g['Away Team']} ({g['Away Person']}){winner_emoji(g['Home Score'], g['Away Score'], 'away')}",
+            "Away Team": f"{g['Away Team']} ({g['Away Person']}){winner_emoji(g['Home Score'], g['Away Score'],'away')}",
             "Away Score": g["Away Score"],
             "Time": g["Time"]
         } for g in big_games])
-        st.dataframe(big_df)
+        st.dataframe(style_winner(big_df))
 
-    # Individual tables per person
+    # Individual tables
     for person, games in individual_games.items():
         if games:
             st.subheader(person)
             person_df = pd.DataFrame([{
-                "Home Team": f"{g['Home Team']} ({g['Home Person']}){winner_emoji(g['Home Score'], g['Away Score'], 'home')}" if g['Home Person']==person else g['Home Team'],
+                "Home Team": f"{g['Home Team']} ({g['Home Person']}){winner_emoji(g['Home Score'], g['Away Score'],'home')}" if g['Home Person']==person else g['Home Team'],
                 "Home Score": g["Home Score"],
-                "Away Team": f"{g['Away Team']} ({g['Away Person']}){winner_emoji(g['Home Score'], g['Away Score'], 'away')}" if g['Away Person']==person else g['Away Team'],
+                "Away Team": f"{g['Away Team']} ({g['Away Person']}){winner_emoji(g['Home Score'], g['Away Score'],'away')}" if g['Away Person']==person else g['Away Team'],
                 "Away Score": g["Away Score"],
                 "Time": g["Time"]
             } for g in games])
-            st.dataframe(person_df)
+            st.dataframe(style_winner(person_df))
 
 # --- Streamlit App ---
 tab1, tab2 = st.tabs(["Leaderboard","Daily Scoreboard"])
@@ -261,20 +264,12 @@ with tab1:
     st.subheader("Individual Performance")
     for person in df_leaderboard['person']:
         with st.expander(f"{person}'s Teams"):
-            person_df = df_merged[df_merged['person']==person][
-                ['school_with_rank','Wins','Losses','Streak','Win Percentage']
-            ].sort_values('Win Percentage', ascending=False)
+            person_df = df_merged[df_merged['person']==person][['school_with_rank','Wins','Losses','Streak','Win Percentage']].sort_values('Win Percentage', ascending=False)
             person_df = person_df.rename(columns={'school_with_rank':'school'})
             avg_win_pct = Decimal(person_df['Win Percentage'].mean() if not person_df.empty else 0)
             avg_win_pct = avg_win_pct.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             person_df['Win Percentage'] = person_df['Win Percentage'].apply(lambda x: f"{Decimal(x*100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}%")
-            summary = pd.DataFrame([{
-                'school':'Total',
-                'Wins': person_df['Wins'].sum(),
-                'Losses': person_df['Losses'].sum(),
-                'Streak':'',
-                'Win Percentage': f"{avg_win_pct}%"
-            }])
+            summary = pd.DataFrame([{'school':'Total','Wins': person_df['Wins'].sum(),'Losses': person_df['Losses'].sum(),'Streak':'','Win Percentage': f"{avg_win_pct}%"}])
             st.dataframe(pd.concat([person_df, summary], ignore_index=True))
 
 with tab2:
@@ -284,5 +279,6 @@ with tab2:
     today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
     selected_date = st.date_input("Select Date", value=today)
     persons = sorted(df_picks['person'].unique())
-    selected_persons = st.multiselect("Filter by Person", options=persons, default=persons)
+    selected_person = st.selectbox("Select Person (or All)", options=["All"]+persons, index=0)
+    selected_persons = persons if selected_person=="All" else [selected_person]
     generate_daily_scoreboard(df_games, df_picks, selected_date, selected_persons)
