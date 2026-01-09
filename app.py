@@ -170,11 +170,15 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     df_merged = pd.merge(df_picks, df_standings, left_on='school', right_on='Team', how='left')
 
     # Leaderboard
-    df_leaderboard = df_merged.groupby('person')['Win Percentage'].mean().reset_index()
+    # Drafter stats
     stats = df_merged.groupby('person')[['Wins','Losses']].sum().reset_index()
     stats['Total Games Played'] = stats['Wins'] + stats['Losses']
-    df_leaderboard = pd.merge(df_leaderboard, stats, on='person', how='left')
-    df_leaderboard = df_leaderboard[['person','Wins','Losses','Total Games Played','Win Percentage']]
+    stats['Win Percentage'] = stats.apply(
+        lambda row: row['Wins'] / row['Total Games Played'] if row['Total Games Played'] > 0 else 0,
+        axis=1
+    )
+    df_leaderboard = stats[['person','Wins','Losses','Total Games Played','Win Percentage']]
+
 
     # Latest ranking
     latest_rankings = df_rankings.sort_values('pollDate').drop_duplicates('teamId', keep='last')
