@@ -3,8 +3,19 @@ import pandas as pd
 import cbbd
 import datetime
 from zoneinfo import ZoneInfo
+import os
+import shutil
 
-# Access token setup (CBBD_ACCESS_TOKEN is stored in Streamlit settings)
+# --- Clear CBBD cache to force fresh download ---
+def clear_cbbd_cache():
+    cache_dir = os.path.expanduser("~/.cbbd")
+    if os.path.exists(cache_dir):
+        shutil.rmtree(cache_dir)
+
+# Run this every time before fetching
+clear_cbbd_cache()
+
+# --- Access token setup ---
 CBBD_ACCESS_TOKEN = st.secrets["CBBD_ACCESS_TOKEN"]
 configuration = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
 
@@ -40,8 +51,7 @@ def load_draft_picks():
     ]
     return pd.DataFrame(draft, columns=columns)
 
-# --- Fetch CBB data ---
-@st.cache_data(ttl=3600)
+# --- Fetch fresh CBBD data ---
 def fetch_cbbd_data():
     config = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
     with cbbd.ApiClient(config) as api_client:
@@ -59,27 +69,19 @@ def fetch_cbbd_data():
 
     return df_teams, df_rankings, df_games
 
-# Function to add emojis to streaks
+# --- Process data (same as your code) ---
 def add_streak_emoji(streak):
     if streak.startswith('W'):
         num = int(streak[1:])
-        if num >= 3:
-            return f"{streak}🔥"  # long winning streak
-        else:
-            return streak
+        return f"{streak}🔥" if num >= 3 else streak
     elif streak.startswith('L'):
         num = int(streak[1:])
-        if num >= 3:
-            return f"{streak}🥶"  # long losing streak
-        else:
-            return streak
+        return f"{streak}🥶" if num >= 3 else streak
     else:
         return streak
 
-# --- Process data ---
-@st.cache_data(ttl=3600)
 def process_data(df_picks, df_teams, df_rankings, df_games):
-    # Team records
+    # --- Team records ---
     team_records = {}
     for _, row in df_games.iterrows():
         home, away, home_pts, away_pts = row['homeTeam'], row['awayTeam'], row['homePoints'], row['awayPoints']
@@ -94,43 +96,23 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index': 'Team'})
     df_standings['Win Percentage'] = df_standings['Wins'] / (df_standings['Wins'] + df_standings['Losses'])
 
-    # Streaks
-    # 1️⃣ Calculate streaks
+    # --- Streaks ---
     df_games_sorted = df_games.sort_values(by='startDate', ascending=False).reset_index(drop=True)
-    team_streaks = {}  # <-- make sure this is defined before using it
-    for index, row in df_games_sorted.iterrows():
-        home_team = row['homeTeam']
-        away_team = row['awayTeam']
-        home_points = row['homePoints']
-        away_points = row['awayPoints']
-    
-        if home_points is None or away_points is None or home_points == away_points:
-            continue
-    
-        if home_points > away_points:
-            winner, loser = home_team, away_team
-        else:
-            winner, loser = away_team, home_team
-    
-        if winner not in team_streaks:
-            team_streaks[winner] = 'W1'
-        else:
-            team_streaks[winner] = f"W{int(team_streaks[winner][1:]) + 1}" if team_streaks[winner].startswith('W') else 'W1'
-    
-        if loser not in team_streaks:
-            team_streaks[loser] = 'L1'
-        else:
-            team_streaks[loser] = f"L{int(team_streaks[loser][1:]) + 1}" if team_streaks[loser].startswith('L') else 'L1'
-    
-    # 2️⃣ Map streaks to df_standings
+    team_streaks = {}
+    for _, row in df_games_sorted.iterrows():
+        home_team, away_team = row['homeTeam'], row['awayTeam']
+        home_pts, away_pts = row['homePoints'], row['awayPoints']
+        if home_pts is None or away_pts is None or home_pts == away_pts: continue
+
+        winner, loser = (home_team, away_team) if home_pts > away_pts else (away_team, home_team)
+
+        team_streaks[winner] = f"W{int(team_streaks[winner][1:])+1}" if winner in team_streaks and team_streaks[winner].startswith('W') else 'W1'
+        team_streaks[loser] = f"L{int(team_streaks[loser][1:])+1}" if loser in team_streaks and team_streaks[loser].startswith('L') else 'L1'
+
     df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
-    
-    # 3️⃣ THEN apply emojis
     df_standings['Streak'] = df_standings['Streak'].apply(add_streak_emoji)
 
-
-
-    # Next game info
+    # --- Next games ---
     df_games['startDate'] = pd.to_datetime(df_games['startDate'])
     now = pd.to_datetime(datetime.datetime.now(datetime.timezone.utc))
     df_future_games = df_games[df_games['startDate'] > now]
@@ -144,17 +126,15 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     df_standings['Next Game Opponent'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('opponent','N/A'))
     df_standings['Next Game Date'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('date','N/A'))
 
-    # Merge picks
+    # --- Merge picks and leaderboard ---
     df_merged = pd.merge(df_picks, df_standings, left_on='school', right_on='Team', how='left')
-
-    # Drafter stats
     df_leaderboard = df_merged.groupby('person')['Win Percentage'].mean().reset_index()
     stats = df_merged.groupby('person')[['Wins','Losses']].sum().reset_index()
     stats['Total Games Played'] = stats['Wins'] + stats['Losses']
     df_leaderboard = pd.merge(df_leaderboard, stats, on='person', how='left')
     df_leaderboard = df_leaderboard[['person','Wins','Losses','Total Games Played','Win Percentage']]
 
-    # --- Add latest AP Poll ranking ---
+    # --- Latest AP ranking ---
     latest_rankings = df_rankings.sort_values('pollDate').drop_duplicates('teamId', keep='last')
     team_rank_map = dict(zip(latest_rankings['teamId'], latest_rankings['ranking']))
     df_merged = pd.merge(df_merged, df_teams[['school','id']], left_on='school', right_on='school', how='left')
@@ -172,19 +152,7 @@ df_picks = load_draft_picks()
 df_teams, df_rankings, df_games = fetch_cbbd_data()
 df_leaderboard, df_merged_picks_standings = process_data(df_picks, df_teams, df_rankings, df_games)
 
-# Latest game date
-if not df_games.empty:
-    df_games['startDate'] = pd.to_datetime(df_games['startDate'], errors='coerce')
-    valid_dates = df_games['startDate'].dropna()
-    latest_game = valid_dates.max() if not valid_dates.empty else None
-    if latest_game:
-        latest_game = latest_game.replace(tzinfo=datetime.timezone.utc).astimezone(ZoneInfo("America/Chicago")) if latest_game.tzinfo is None else latest_game.astimezone(ZoneInfo("America/Chicago"))
-        st.caption(f"Game data as of: {latest_game.strftime('%Y-%m-%d %H:%M %Z')}")
-    else:
-        st.caption("Game data as of: N/A")
-else:
-    st.caption("Game data as of: N/A")
-
+# Display last update time
 st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M %Z')}")
 
 # Leaderboard
@@ -194,23 +162,3 @@ filtered_leaderboard = leaderboard_data[leaderboard_data['person'].isin(selected
 filtered_leaderboard['Win Percentage'] = filtered_leaderboard['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
 st.subheader("Overall Leaderboard")
 st.dataframe(filtered_leaderboard)
-
-# Individual performance
-st.subheader("Individual Performance")
-for person in df_leaderboard['person'].unique():
-    with st.expander(f"{person}'s Teams"):
-        person_df = df_merged_picks_standings[df_merged_picks_standings['person']==person][
-            ['school_with_rank','Wins','Losses','Streak','Win Percentage']
-        ].sort_values('Win Percentage', ascending=False)
-        person_df = person_df.rename(columns={'school_with_rank':'school'})
-        avg_win_pct = person_df['Win Percentage'].mean() if not person_df.empty else 0
-        avg_win_pct = round(avg_win_pct*100,2)
-        person_df['Win Percentage'] = person_df['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
-        summary = pd.DataFrame([{
-            'school':'Total',
-            'Wins': person_df['Wins'].sum(),
-            'Losses': person_df['Losses'].sum(),
-            'Streak':'',
-            'Win Percentage': f"{avg_win_pct:.2f}%"
-        }])
-        st.dataframe(pd.concat([person_df, summary], ignore_index=True))
