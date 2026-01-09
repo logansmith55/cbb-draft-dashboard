@@ -61,6 +61,20 @@ def format_win_pct(wins, losses):
     pct = pct.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return f"{pct}%"
 
+def format_game_time(dt):
+    # dt is already Central time
+    return dt.strftime("%-I:%M %p")  # 12-hour with AM/PM
+
+def winner_emoji(home_pts, away_pts, team):
+    if pd.isna(home_pts) or pd.isna(away_pts):
+        return ""
+    if home_pts > away_pts and team == "home":
+        return " 🔥"
+    elif away_pts > home_pts and team == "away":
+        return " 🔥"
+    else:
+        return ""
+
 # --- Fetch functions ---
 @st.cache_data(ttl=3600)
 def fetch_teams():
@@ -146,7 +160,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
         if not future_games.empty:
             next_game = future_games.sort_values('startDate').iloc[0]
             opponent = next_game['awayTeam'] if next_game['homeTeam']==team else next_game['homeTeam']
-            next_game_info[team] = {"opponent": opponent, "date": next_game['startDate'].strftime("%Y-%m-%d %H:%M")}
+            next_game_info[team] = {"opponent": opponent, "date": next_game['startDate'].strftime("%Y-%m-%d %I:%M %p")}
     df_standings['Next Game Opponent'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('opponent','N/A'))
     df_standings['Next Game Date'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('date','N/A'))
 
@@ -194,7 +208,7 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
             "Away Team": away,
             "Away Score": away_pts if pd.notna(away_pts) else "",
             "Away Person": away_person if away_person else "",
-            "Time": row['startDate'].strftime("%H:%M")
+            "Time": format_game_time(row['startDate'])
         }
 
         if home_person and away_person:
@@ -208,9 +222,9 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
     if big_games:
         st.subheader("Big Games")
         big_df = pd.DataFrame([{
-            "Home Team": f"{g['Home Team']} ({g['Home Person']})",
+            "Home Team": f"{g['Home Team']} ({g['Home Person']}){winner_emoji(g['Home Score'], g['Away Score'], 'home')}",
             "Home Score": g["Home Score"],
-            "Away Team": f"{g['Away Team']} ({g['Away Person']})",
+            "Away Team": f"{g['Away Team']} ({g['Away Person']}){winner_emoji(g['Home Score'], g['Away Score'], 'away')}",
             "Away Score": g["Away Score"],
             "Time": g["Time"]
         } for g in big_games])
@@ -221,9 +235,9 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
         if games:
             st.subheader(person)
             person_df = pd.DataFrame([{
-                "Home Team": f"{g['Home Team']} ({g['Home Person']})" if g['Home Person']==person else g['Home Team'],
+                "Home Team": f"{g['Home Team']} ({g['Home Person']}){winner_emoji(g['Home Score'], g['Away Score'], 'home')}" if g['Home Person']==person else g['Home Team'],
                 "Home Score": g["Home Score"],
-                "Away Team": f"{g['Away Team']} ({g['Away Person']})" if g['Away Person']==person else g['Away Team'],
+                "Away Team": f"{g['Away Team']} ({g['Away Person']}){winner_emoji(g['Home Score'], g['Away Score'], 'away')}" if g['Away Person']==person else g['Away Team'],
                 "Away Score": g["Away Score"],
                 "Time": g["Time"]
             } for g in games])
@@ -240,7 +254,7 @@ with tab1:
     df_games = fetch_games()
     df_leaderboard, df_merged = process_data(df_picks, df_teams, df_rankings, df_games)
 
-    st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M %Z')}")
+    st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %I:%M %p %Z')}")
     st.subheader("Overall Leaderboard")
     st.dataframe(df_leaderboard.sort_values('Win Percentage', ascending=False).reset_index(drop=True))
 
