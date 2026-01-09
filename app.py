@@ -189,8 +189,6 @@ st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).s
 
 # Leaderboard
 leaderboard_data = df_leaderboard.sort_values('Win Percentage', ascending=False).reset_index(drop=True)
-selected_persons = st.multiselect("Filter by Person", options=leaderboard_data['person'].unique(), default=leaderboard_data['person'].unique())
-filtered_leaderboard = leaderboard_data[leaderboard_data['person'].isin(selected_persons)]
 filtered_leaderboard['Win Percentage'] = filtered_leaderboard['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
 st.subheader("Overall Leaderboard")
 st.dataframe(filtered_leaderboard)
