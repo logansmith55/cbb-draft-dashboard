@@ -191,7 +191,7 @@ filtered_leaderboard['Win Percentage'] = filtered_leaderboard['Win Percentage'].
 st.subheader("Overall Leaderboard")
 st.dataframe(filtered_leaderboard)
 
-# Individual performance
+# Individual performance with correct streaks
 st.subheader("Individual Performance")
 for person in df_leaderboard['person'].unique():
     with st.expander(f"{person}'s Teams"):
