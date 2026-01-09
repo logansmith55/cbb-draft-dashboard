@@ -64,20 +64,6 @@ def format_win_pct(wins, losses):
 def format_game_time(dt):
     return dt.strftime("%-I:%M %p")  # 12-hour with AM/PM
 
-def winner_emoji(home_pts, away_pts, team):
-    if pd.isna(home_pts) or pd.isna(away_pts):
-        return ""
-    if home_pts > away_pts and team=="home":
-        return " 🔥"
-    elif away_pts > home_pts and team=="away":
-        return " 🔥"
-    elif home_pts < away_pts and team=="home":
-        return " 🥶"
-    elif away_pts < home_pts and team=="away":
-        return " 🥶"
-    else:
-        return ""
-
 # --- Fetch functions ---
 @st.cache_data(ttl=3600)
 def fetch_teams():
@@ -179,7 +165,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 
     return df_leaderboard, df_merged
 
-# --- Daily scoreboard with winner highlight ---
+# --- Daily scoreboard with color highlights ---
 def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_persons):
     df_games['startDate'] = pd.to_datetime(df_games['startDate']).dt.tz_convert(ZoneInfo('America/Chicago'))
     date_games = df_games[df_games['startDate'].dt.date==selected_date]
@@ -197,7 +183,7 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
         game_info = {
             "Home Team": home, "Home Score": home_pts, "Home Person": home_person,
             "Away Team": away, "Away Score": away_pts, "Away Person": away_person,
-            "Time": format_game_time(row['startDate'])
+            "Time": row['startDate'].strftime("%-I:%M %p")
         }
 
         if home_person and away_person:
@@ -206,45 +192,45 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
             if home_person==person or away_person==person:
                 individual_games[person].append(game_info)
 
-    def style_winner(df):
+    def style_colors(df):
         def highlight(row):
+            style = ['']*len(row)
             home_pts = row['Home Score']
             away_pts = row['Away Score']
-            style = ['']*len(row)
             if pd.notna(home_pts) and pd.notna(away_pts):
                 if home_pts>away_pts:
-                    style[0] = 'background-color: #d4edda'  # green for winner
-                    style[1] = 'background-color: #d4edda'
+                    style[0] = style[1] = 'background-color: #d4edda'  # light green winner
+                    style[2] = style[3] = 'background-color: #f8d7da'  # light red loser
                 elif away_pts>home_pts:
-                    style[2] = 'background-color: #d4edda'
-                    style[3] = 'background-color: #d4edda'
+                    style[0] = style[1] = 'background-color: #f8d7da'
+                    style[2] = style[3] = 'background-color: #d4edda'
             return style
         return df.style.apply(highlight, axis=1)
 
-    # Big Games table
+    # Big Games
     if big_games:
         st.subheader("Big Games")
         big_df = pd.DataFrame([{
-            "Home Team": f"{g['Home Team']} ({g['Home Person']}){winner_emoji(g['Home Score'], g['Away Score'],'home')}",
+            "Home Team": f"{g['Home Team']} ({g['Home Person']})",
             "Home Score": g["Home Score"],
-            "Away Team": f"{g['Away Team']} ({g['Away Person']}){winner_emoji(g['Home Score'], g['Away Score'],'away')}",
+            "Away Team": f"{g['Away Team']} ({g['Away Person']})",
             "Away Score": g["Away Score"],
             "Time": g["Time"]
         } for g in big_games])
-        st.dataframe(style_winner(big_df))
+        st.dataframe(style_colors(big_df))
 
     # Individual tables
     for person, games in individual_games.items():
         if games:
             st.subheader(person)
             person_df = pd.DataFrame([{
-                "Home Team": f"{g['Home Team']} ({g['Home Person']}){winner_emoji(g['Home Score'], g['Away Score'],'home')}" if g['Home Person']==person else g['Home Team'],
+                "Home Team": f"{g['Home Team']} ({g['Home Person']})" if g['Home Person']==person else g['Home Team'],
                 "Home Score": g["Home Score"],
-                "Away Team": f"{g['Away Team']} ({g['Away Person']}){winner_emoji(g['Home Score'], g['Away Score'],'away')}" if g['Away Person']==person else g['Away Team'],
+                "Away Team": f"{g['Away Team']} ({g['Away Person']})" if g['Away Person']==person else g['Away Team'],
                 "Away Score": g["Away Score"],
                 "Time": g["Time"]
             } for g in games])
-            st.dataframe(style_winner(person_df))
+            st.dataframe(style_colors(person_df))
 
 # --- Streamlit App ---
 tab1, tab2 = st.tabs(["Leaderboard","Daily Scoreboard"])
@@ -266,8 +252,7 @@ with tab1:
         with st.expander(f"{person}'s Teams"):
             person_df = df_merged[df_merged['person']==person][['school_with_rank','Wins','Losses','Streak','Win Percentage']].sort_values('Win Percentage', ascending=False)
             person_df = person_df.rename(columns={'school_with_rank':'school'})
-            avg_win_pct = Decimal(person_df['Win Percentage'].mean() if not person_df.empty else 0)
-            avg_win_pct = avg_win_pct.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            avg_win_pct = Decimal(person_df['Win Percentage'].mean() if not person_df.empty else 0).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             person_df['Win Percentage'] = person_df['Win Percentage'].apply(lambda x: f"{Decimal(x*100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}%")
             summary = pd.DataFrame([{'school':'Total','Wins': person_df['Wins'].sum(),'Losses': person_df['Losses'].sum(),'Streak':'','Win Percentage': f"{avg_win_pct}%"}])
             st.dataframe(pd.concat([person_df, summary], ignore_index=True))
