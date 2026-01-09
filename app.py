@@ -119,7 +119,12 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
                 team_records[home]["Losses"] += 1
 
     df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index': 'Team'})
-    df_standings['Win Percentage'] = df_standings.apply(lambda row: to_google_sheets_pct(row['Wins'] / (row['Wins'] + row['Losses'])), axis=1)
+    df_standings['Win Percentage'] = df_standings.apply(
+    lambda row: to_google_sheets_pct(row['Wins'] / (row['Wins'] + row['Losses']))
+    if (row['Wins'] + row['Losses']) > 0 else 0,
+    axis=1
+    )
+
 
     # --- Correct streaks: chronological ---
     df_games_sorted = df_games.sort_values('startDate', ascending=True)
