@@ -115,17 +115,31 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index': 'Team'})
     df_standings['Win Percentage'] = df_standings['Wins'] / (df_standings['Wins'] + df_standings['Losses'])
 
-    # Streaks
-    df_games_sorted = df_games.sort_values('startDate', ascending=False)
-    team_streaks = {}
-    for _, row in df_games_sorted.iterrows():
-        home_team, away_team = row['homeTeam'], row['awayTeam']
-        home_pts, away_pts = row['homePoints'], row['awayPoints']
-        if home_pts is None or away_pts is None or home_pts == away_pts:
-            continue
-        winner, loser = (home_team, away_team) if home_pts > away_pts else (away_team, home_team)
-        team_streaks[winner] = f"W{int(team_streaks[winner][1:])+1}" if winner in team_streaks and team_streaks[winner].startswith('W') else "W1"
-        team_streaks[loser] = f"L{int(team_streaks[loser][1:])+1}" if loser in team_streaks and team_streaks[loser].startswith('L') else "L1"
+# Correct streak calculation: oldest first
+df_games_sorted = df_games.sort_values('startDate', ascending=True)
+team_streaks = {}
+
+for _, row in df_games_sorted.iterrows():
+    home_team, away_team = row['homeTeam'], row['awayTeam']
+    home_pts, away_pts = row['homePoints'], row['awayPoints']
+    
+    # Skip ties or missing scores
+    if home_pts is None or away_pts is None or home_pts == away_pts:
+        continue
+
+    winner, loser = (home_team, away_team) if home_pts > away_pts else (away_team, home_team)
+
+    # Update winner streak
+    if winner in team_streaks and team_streaks[winner].startswith('W'):
+        team_streaks[winner] = f"W{int(team_streaks[winner][1:]) + 1}"
+    else:
+        team_streaks[winner] = "W1"
+
+    # Update loser streak
+    if loser in team_streaks and team_streaks[loser].startswith('L'):
+        team_streaks[loser] = f"L{int(team_streaks[loser][1:]) + 1}"
+    else:
+        team_streaks[loser] = "L1"
 
     df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
     df_standings['Streak'] = df_standings['Streak'].apply(add_streak_emoji)
