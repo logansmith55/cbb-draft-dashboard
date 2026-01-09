@@ -69,9 +69,9 @@ def winner_emoji(home_pts, away_pts, team):
     if pd.isna(home_pts) or pd.isna(away_pts):
         return ""
     if home_pts > away_pts and team == "home":
-        return " 🔥"
+        return " ✅"
     elif away_pts > home_pts and team == "away":
-        return " 🔥"
+        return " ✅"
     else:
         return ""
 
