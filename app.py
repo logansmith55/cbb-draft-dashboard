@@ -40,24 +40,44 @@ def load_draft_picks():
     ]
     return pd.DataFrame(draft, columns=columns)
 
-# --- Fetch CBB data ---
+# --- Fetch CBB data (only drafted teams) ---
 @st.cache_data(ttl=3600)
 def fetch_cbbd_data():
     config = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
     with cbbd.ApiClient(config) as api_client:
+        # 1️⃣ Teams
         teams_api = cbbd.TeamsApi(api_client)
         teams = teams_api.get_teams()
         df_teams = pd.DataFrame([team.to_dict() for team in teams])
 
+        # 2️⃣ Rankings
         rankings_api = cbbd.RankingsApi(api_client)
         rankings = rankings_api.get_rankings(season=2026)
         df_rankings = pd.DataFrame([rank.to_dict() for rank in rankings])
 
-        games_api = cbbd.api.games_api.GamesApi(api_client)
-        games = games_api.get_games(season=2026)
-        df_games = pd.DataFrame([game.to_dict() for game in games])
+        # 3️⃣ Games (only drafted teams)
+        df_picks = load_draft_picks()
+        draft_team_ids = df_picks['team_id'].tolist()
+        games_api_instance = cbbd.api.games_api.GamesApi(api_client)
+
+        df_games_list = []
+        for team_id in draft_team_ids:
+            try:
+                games = games_api_instance.get_games(season=2026, team_ids=[team_id])
+                df_team_games = pd.DataFrame([game.to_dict() for game in games])
+                df_games_list.append(df_team_games)
+            except Exception as e:
+                st.warning(f"Error fetching games for team_id {team_id}: {e}")
+
+        # Combine all games and remove duplicates
+        if df_games_list:
+            df_games = pd.concat(df_games_list, ignore_index=True)
+            df_games.drop_duplicates(subset='id', inplace=True)
+        else:
+            df_games = pd.DataFrame()  # empty fallback
 
     return df_teams, df_rankings, df_games
+
 
 # Function to add emojis to streaks
 def add_streak_emoji(streak):
