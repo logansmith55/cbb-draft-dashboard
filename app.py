@@ -185,12 +185,6 @@ df_rankings = fetch_rankings()
 df_games = fetch_games()
 df_leaderboard, df_merged = process_data(df_picks, df_teams, df_rankings, df_games)
 
-# Latest game date
-if not df_games.empty:
-    latest_game = pd.to_datetime(df_games['startDate']).max()
-    latest_game = latest_game.replace(tzinfo=datetime.timezone.utc).astimezone(ZoneInfo("America/Chicago"))
-    st.caption(f"Game data as of: {latest_game.strftime('%Y-%m-%d %H:%M %Z')}")
-
 st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M %Z')}")
 
 # Leaderboard
