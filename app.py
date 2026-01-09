@@ -39,9 +39,9 @@ def load_draft_picks():
         [65, "DePaul", "Sam"], [236, "Purdue", "Sam"], [292, "Tennessee", "Sam"], [220, "Ole Miss", "Sam"]
     ]
     return pd.DataFrame(draft, columns=columns)
-# --- Fetch CBB data (filter games after fetch) ---
+# --- Fetch CBB data (split season into date ranges to bypass API limit) ---
 @st.cache_data(ttl=3600)
-def fetch_cbbd_data():
+def fetch_cbbd_data_split():
     config = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
     with cbbd.ApiClient(config) as api_client:
 
@@ -55,25 +55,39 @@ def fetch_cbbd_data():
         rankings = rankings_api.get_rankings(season=2026)
         df_rankings = pd.DataFrame([rank.to_dict() for rank in rankings])
 
-        # 3️⃣ Games — fetch all
+        # 3️⃣ Games — split into two date ranges
         games_api_instance = cbbd.api.games_api.GamesApi(api_client)
-        all_games = games_api_instance.get_games(season=2026)
-        df_all_games = pd.DataFrame([game.to_dict() for game in all_games])
+        date_ranges = [
+            ("2025-11-01", "2026-01-01"),  # early season
+            ("2026-01-02", "2026-12-31")   # rest of season
+        ]
 
-    # Now filter only games involving drafted teams
-    df_picks = load_draft_picks()
-    draft_ids = df_picks['team_id'].tolist()
+        df_games_list = []
+        for start, end in date_ranges:
+            try:
+                games = games_api_instance.get_games(season=2026, start_date=start, end_date=end)
+                df_chunk = pd.DataFrame([game.to_dict() for game in games])
+                df_games_list.append(df_chunk)
+            except Exception as e:
+                st.warning(f"Error fetching games for {start} to {end}: {e}")
 
-    # Filter matches where either home or away matches a draft team
-    df_games = df_all_games[
-        (df_all_games['homeTeamId'].isin(draft_ids)) |
-        (df_all_games['awayTeamId'].isin(draft_ids))
-    ].copy()
+        # Combine both chunks
+        if df_games_list:
+            df_games = pd.concat(df_games_list, ignore_index=True)
+            df_games.drop_duplicates(subset='id', inplace=True)
+        else:
+            df_games = pd.DataFrame()  # fallback
 
-    # Remove duplicates if needed
-    df_games.drop_duplicates(subset='id', inplace=True)
+        # Filter to only drafted teams
+        df_picks = load_draft_picks()
+        draft_ids = df_picks['team_id'].tolist()
+        df_games = df_games[
+            (df_games['homeTeamId'].isin(draft_ids)) |
+            (df_games['awayTeamId'].isin(draft_ids))
+        ].copy()
 
     return df_teams, df_rankings, df_games
+
 
 # Function to add emojis to streaks
 def add_streak_emoji(streak):
