@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import datetime
 from zoneinfo import ZoneInfo
+import math
 
 # --- Secrets ---
 API_KEY = st.secrets["CBBD_ACCESS_TOKEN"]
@@ -52,6 +53,11 @@ def add_streak_emoji(streak):
         return f"{streak}🥶" if num >= 3 else streak
     else:
         return streak
+
+# --- Helper to match Google Sheets win pct ---
+def to_google_sheets_pct(value):
+    """Converts a fraction (0-1) to a percentage with two decimals like Google Sheets."""
+    return math.floor(value * 10000) / 100
 
 # --- Fetch teams ---
 @st.cache_data(ttl=3600)
@@ -113,7 +119,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
                 team_records[home]["Losses"] += 1
 
     df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index': 'Team'})
-    df_standings['Win Percentage'] = df_standings['Wins'] / (df_standings['Wins'] + df_standings['Losses'])
+    df_standings['Win Percentage'] = df_standings.apply(lambda row: to_google_sheets_pct(row['Wins'] / (row['Wins'] + row['Losses'])), axis=1)
 
     # --- Correct streaks: chronological ---
     df_games_sorted = df_games.sort_values('startDate', ascending=True)
@@ -189,7 +195,7 @@ st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).s
 
 # Leaderboard
 leaderboard_data = df_leaderboard.sort_values('Win Percentage', ascending=False).reset_index(drop=True)
-leaderboard_data['Win Percentage'] = leaderboard_data['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
+leaderboard_data['Win Percentage'] = leaderboard_data['Win Percentage'].apply(lambda x: f"{x:.2f}%")
 st.subheader("Overall Leaderboard")
 st.dataframe(leaderboard_data)
 
@@ -202,8 +208,7 @@ for person in df_leaderboard['person'].unique():
         ].sort_values('Win Percentage', ascending=False)
         person_df = person_df.rename(columns={'school_with_rank':'school'})
         avg_win_pct = person_df['Win Percentage'].mean() if not person_df.empty else 0
-        avg_win_pct = round(avg_win_pct*100,2)
-        person_df['Win Percentage'] = person_df['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
+        avg_win_pct = to_google_sheets_pct(avg_win_pct)
         summary = pd.DataFrame([{
             'school':'Total',
             'Wins': person_df['Wins'].sum(),
