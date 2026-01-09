@@ -59,8 +59,7 @@ def fetch_teams():
     headers = {"Authorization": f"Bearer {API_KEY}"}
     response = requests.get(BASE_URL_TEAMS, headers=headers)
     response.raise_for_status()
-    df_teams = pd.DataFrame(response.json())
-    return df_teams
+    return pd.DataFrame(response.json())
 
 # --- Fetch rankings ---
 @st.cache_data(ttl=3600)
@@ -68,10 +67,9 @@ def fetch_rankings():
     headers = {"Authorization": f"Bearer {API_KEY}"}
     response = requests.get(BASE_URL_RANKINGS, headers=headers, params={"season": 2026})
     response.raise_for_status()
-    df_rankings = pd.DataFrame(response.json())
-    return df_rankings
+    return pd.DataFrame(response.json())
 
-# --- Fetch games for drafted teams ---
+# --- Fetch games ---
 @st.cache_data(ttl=3600)
 def fetch_games():
     df_picks = load_draft_picks()
@@ -93,8 +91,6 @@ def fetch_games():
             st.warning(f"Error fetching games for {team}: {response.text}")
 
     df_games = pd.DataFrame(all_games).drop_duplicates(subset="id")
-
-    # Convert startDate from UTC → Central Time
     df_games['startDate'] = pd.to_datetime(df_games['startDate']).dt.tz_convert(ZoneInfo('America/Chicago'))
     return df_games
 
@@ -116,12 +112,11 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
                 team_records[home]["Losses"] += 1
 
     df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index': 'Team'})
-    # Fix win pct rounding same as Google Sheets
     df_standings['Win Percentage'] = df_standings.apply(
         lambda row: round(row['Wins'] / (row['Wins'] + row['Losses']) if (row['Wins'] + row['Losses'])>0 else 0,4), axis=1
     )
 
-    # Streaks (chronological)
+    # Streaks
     df_games_sorted = df_games.sort_values('startDate', ascending=True)
     team_streaks = {}
     for _, row in df_games_sorted.iterrows():
@@ -152,7 +147,7 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     # Merge picks
     df_merged = pd.merge(df_picks, df_standings, left_on='school', right_on='Team', how='left')
 
-    # Leaderboard
+    # Individual leaderboard
     df_leaderboard = df_merged.groupby('person')['Win Percentage'].mean().reset_index()
     stats = df_merged.groupby('person')[['Wins','Losses']].sum().reset_index()
     stats['Total Games Played'] = stats['Wins'] + stats['Losses']
@@ -179,7 +174,7 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
     team_person_map = dict(zip(df_picks_filtered['school'], df_picks_filtered['person']))
 
     big_games = []
-    individual_games = {}
+    individual_games = {person: [] for person in selected_persons}
 
     for _, row in date_games.iterrows():
         home, away = row['homeTeam'], row['awayTeam']
@@ -197,39 +192,39 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
             "Time": row['startDate'].strftime("%H:%M")
         }
 
+        # Big game
         if home_person and away_person:
             big_games.append(game_info)
-        else:
-            for person, team_col in [(home_person, "Home"), (away_person, "Away")]:
-                if person:
-                    if person not in individual_games:
-                        individual_games[person] = []
-                    individual_games[person].append(game_info)
+
+        # Add to individual games
+        for person in selected_persons:
+            if (home_person==person or away_person==person):
+                individual_games[person].append(game_info)
 
     # Display Big Games
     if big_games:
         st.subheader("Big Games")
         for game in big_games:
-            df_display = pd.DataFrame([{
+            st.dataframe(pd.DataFrame([{
                 "Home Team": f"{game['Home Team']} ({game['Home Person']})",
                 "Home Score": game["Home Score"],
                 "Away Team": f"{game['Away Team']} ({game['Away Person']})",
                 "Away Score": game["Away Score"],
                 "Time": game["Time"]
-            }])
-            st.dataframe(df_display)
+            }]))
 
-    # Display individual games
+    # Display individual games per person
     for person, games in individual_games.items():
-        st.subheader(person)
-        df_display = pd.DataFrame([{
-            "Home Team": f"{g['Home Team']} ({g['Home Person']})" if g['Home Person']==person else g['Home Team'],
-            "Home Score": g["Home Score"],
-            "Away Team": f"{g['Away Team']} ({g['Away Person']})" if g['Away Person']==person else g['Away Team'],
-            "Away Score": g["Away Score"],
-            "Time": g["Time"]
-        } for g in games])
-        st.dataframe(df_display)
+        if games:
+            st.subheader(person)
+            df_display = pd.DataFrame([{
+                "Home Team": f"{g['Home Team']} ({g['Home Person']})" if g['Home Person']==person else g['Home Team'],
+                "Home Score": g["Home Score"],
+                "Away Team": f"{g['Away Team']} ({g['Away Person']})" if g['Away Person']==person else g['Away Team'],
+                "Away Score": g["Away Score"],
+                "Time": g["Time"]
+            } for g in games])
+            st.dataframe(df_display)
 
 # --- Streamlit App ---
 st.title("Metro Sharon CBB Draft Dashboard")
@@ -247,6 +242,26 @@ with tab1:
     leaderboard_data['Win Percentage'] = leaderboard_data['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
     st.subheader("Overall Leaderboard")
     st.dataframe(leaderboard_data)
+
+    # Individual performance tables
+    st.subheader("Individual Performance")
+    for person in df_leaderboard['person']:
+        with st.expander(f"{person}'s Teams"):
+            person_df = df_merged[df_merged['person']==person][
+                ['school_with_rank','Wins','Losses','Streak','Win Percentage']
+            ].sort_values('Win Percentage', ascending=False)
+            person_df = person_df.rename(columns={'school_with_rank':'school'})
+            avg_win_pct = person_df['Win Percentage'].mean() if not person_df.empty else 0
+            avg_win_pct = round(avg_win_pct*100,2)
+            person_df['Win Percentage'] = person_df['Win Percentage'].apply(lambda x: f"{x*100:.2f}%")
+            summary = pd.DataFrame([{
+                'school':'Total',
+                'Wins': person_df['Wins'].sum(),
+                'Losses': person_df['Losses'].sum(),
+                'Streak':'',
+                'Win Percentage': f"{avg_win_pct:.2f}%"
+            }])
+            st.dataframe(pd.concat([person_df, summary], ignore_index=True))
 
 with tab2:
     st.subheader("Daily Scoreboard")
