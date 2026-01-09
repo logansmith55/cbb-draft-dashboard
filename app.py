@@ -63,8 +63,9 @@ def fetch_cbbd_data():
         df_games_list = []
         for team_id in draft_team_ids:
             try:
-                games = games_api_instance.get_games(season=2026, team_ids=[team_id])
-                df_team_games = pd.DataFrame([game.to_dict() for game in games])
+                # Correct method: get games for a single team
+                team_games = games_api_instance.get_games_by_team(team_id=team_id, season=2026)
+                df_team_games = pd.DataFrame([game.to_dict() for game in team_games])
                 df_games_list.append(df_team_games)
             except Exception as e:
                 st.warning(f"Error fetching games for team_id {team_id}: {e}")
@@ -77,7 +78,6 @@ def fetch_cbbd_data():
             df_games = pd.DataFrame()  # empty fallback
 
     return df_teams, df_rankings, df_games
-
 
 # Function to add emojis to streaks
 def add_streak_emoji(streak):
