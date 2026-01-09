@@ -1,11 +1,14 @@
 import streamlit as st
 import pandas as pd
-import cbbd
+import requests
 import datetime
 from zoneinfo import ZoneInfo
 
-# Access token
-CBBD_ACCESS_TOKEN = st.secrets["CBBD_ACCESS_TOKEN"]
+# --- Secrets ---
+API_KEY = st.secrets["CBBD_ACCESS_TOKEN"]
+BASE_URL_GAMES = "https://api.collegebasketballdata.com/games"
+BASE_URL_TEAMS = "https://api.collegebasketballdata.com/teams"
+BASE_URL_RANKINGS = "https://api.collegebasketballdata.com/rankings"
 
 # --- Draft picks ---
 @st.cache_data(ttl=3600)
@@ -39,70 +42,58 @@ def load_draft_picks():
     ]
     return pd.DataFrame(draft, columns=columns)
 
-# --- Add emojis for streaks ---
+# --- Helper to add streak emojis ---
 def add_streak_emoji(streak):
     if streak.startswith('W'):
         num = int(streak[1:])
-        if num >= 3:
-            return f"{streak}🔥"
-        else:
-            return streak
+        return f"{streak}🔥" if num >= 3 else streak
     elif streak.startswith('L'):
         num = int(streak[1:])
-        if num >= 3:
-            return f"{streak}🥶"
-        else:
-            return streak
+        return f"{streak}🥶" if num >= 3 else streak
     else:
         return streak
 
-# --- Fetch CBB data with split API calls ---
+# --- Fetch teams ---
 @st.cache_data(ttl=3600)
-def fetch_cbbd_data():
-    config = cbbd.Configuration(access_token=CBBD_ACCESS_TOKEN)
-    with cbbd.ApiClient(config) as api_client:
+def fetch_teams():
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    response = requests.get(BASE_URL_TEAMS, headers=headers)
+    response.raise_for_status()
+    df_teams = pd.DataFrame(response.json())
+    return df_teams
 
-        # 1️⃣ Teams
-        teams_api = cbbd.TeamsApi(api_client)
-        teams = teams_api.get_teams()
-        df_teams = pd.DataFrame([team.to_dict() for team in teams])
+# --- Fetch rankings ---
+@st.cache_data(ttl=3600)
+def fetch_rankings():
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    response = requests.get(BASE_URL_RANKINGS, headers=headers, params={"season": 2026})
+    response.raise_for_status()
+    df_rankings = pd.DataFrame(response.json())
+    return df_rankings
 
-        # 2️⃣ Rankings
-        rankings_api = cbbd.RankingsApi(api_client)
-        rankings = rankings_api.get_rankings(season=2026)
-        df_rankings = pd.DataFrame([rank.to_dict() for rank in rankings])
+# --- Fetch all games for drafted teams ---
+@st.cache_data(ttl=3600)
+def fetch_games():
+    df_picks = load_draft_picks()
+    draft_teams = df_picks["school"].unique()
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    all_games = []
 
-        # 3️⃣ Games — split season into two date ranges
-        games_api_instance = cbbd.api.games_api.GamesApi(api_client)
-        date_ranges = [
-            ("2025-11-01", "2026-01-01"),  # early season
-            ("2026-01-02", "2026-12-31")   # rest of season
-        ]
-        df_games_list = []
-
-        for start, end in date_ranges:
-            try:
-                games = games_api_instance.get_games(season=2026, start_date=start, end_date=end)
-                df_chunk = pd.DataFrame([game.to_dict() for game in games])
-                df_games_list.append(df_chunk)
-            except Exception as e:
-                st.warning(f"Error fetching games for {start} to {end}: {e}")
-
-        if df_games_list:
-            df_games = pd.concat(df_games_list, ignore_index=True)
-            df_games.drop_duplicates(subset='id', inplace=True)
+    for team in draft_teams:
+        params = {
+            "season": 2026,
+            "team": team,
+            "startDateRange": "2025-11-01",
+            "endDateRange": "2026-12-31"
+        }
+        response = requests.get(BASE_URL_GAMES, headers=headers, params=params)
+        if response.status_code == 200:
+            all_games.extend(response.json())
         else:
-            df_games = pd.DataFrame()
+            st.warning(f"Error fetching games for {team}: {response.text}")
 
-        # Filter only drafted teams
-        df_picks = load_draft_picks()
-        draft_ids = df_picks['team_id'].tolist()
-        df_games = df_games[
-            (df_games['homeTeamId'].isin(draft_ids)) |
-            (df_games['awayTeamId'].isin(draft_ids))
-        ].copy()
-
-    return df_teams, df_rankings, df_games
+    df_games = pd.DataFrame(all_games).drop_duplicates(subset="id")
+    return df_games
 
 # --- Process data ---
 @st.cache_data(ttl=3600)
@@ -111,21 +102,21 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
     team_records = {}
     for _, row in df_games.iterrows():
         home, away, home_pts, away_pts = row['homeTeam'], row['awayTeam'], row['homePoints'], row['awayPoints']
-        if home not in team_records: team_records[home] = {'Wins': 0, 'Losses': 0}
-        if away not in team_records: team_records[away] = {'Wins': 0, 'Losses': 0}
+        if home not in team_records: team_records[home] = {"Wins": 0, "Losses": 0}
+        if away not in team_records: team_records[away] = {"Wins": 0, "Losses": 0}
         if pd.notna(home_pts) and pd.notna(away_pts):
             if home_pts > away_pts:
-                team_records[home]['Wins'] += 1
-                team_records[away]['Losses'] += 1
+                team_records[home]["Wins"] += 1
+                team_records[away]["Losses"] += 1
             elif away_pts > home_pts:
-                team_records[away]['Wins'] += 1
-                team_records[home]['Losses'] += 1
+                team_records[away]["Wins"] += 1
+                team_records[home]["Losses"] += 1
 
     df_standings = pd.DataFrame.from_dict(team_records, orient='index').reset_index().rename(columns={'index': 'Team'})
     df_standings['Win Percentage'] = df_standings['Wins'] / (df_standings['Wins'] + df_standings['Losses'])
 
     # Streaks
-    df_games_sorted = df_games.sort_values(by='startDate', ascending=False).reset_index(drop=True)
+    df_games_sorted = df_games.sort_values('startDate', ascending=False)
     team_streaks = {}
     for _, row in df_games_sorted.iterrows():
         home_team, away_team = row['homeTeam'], row['awayTeam']
@@ -133,8 +124,8 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
         if home_pts is None or away_pts is None or home_pts == away_pts:
             continue
         winner, loser = (home_team, away_team) if home_pts > away_pts else (away_team, home_team)
-        team_streaks[winner] = f"W{int(team_streaks[winner][1:])+1}" if winner in team_streaks and team_streaks[winner].startswith('W') else 'W1'
-        team_streaks[loser] = f"L{int(team_streaks[loser][1:])+1}" if loser in team_streaks and team_streaks[loser].startswith('L') else 'L1'
+        team_streaks[winner] = f"W{int(team_streaks[winner][1:])+1}" if winner in team_streaks and team_streaks[winner].startswith('W') else "W1"
+        team_streaks[loser] = f"L{int(team_streaks[loser][1:])+1}" if loser in team_streaks and team_streaks[loser].startswith('L') else "L1"
 
     df_standings['Streak'] = df_standings['Team'].map(team_streaks).fillna('N/A')
     df_standings['Streak'] = df_standings['Streak'].apply(add_streak_emoji)
@@ -149,9 +140,9 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
         if not future_games.empty:
             next_game = future_games.sort_values('startDate').iloc[0]
             opponent = next_game['awayTeam'] if next_game['homeTeam']==team else next_game['homeTeam']
-            next_game_info[team] = {'opponent': opponent, 'date': next_game['startDate'].strftime('%Y-%m-%d %H:%M')}
-    df_standings['Next Game Opponent'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('opponent','N/A'))
-    df_standings['Next Game Date'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('date','N/A'))
+            next_game_info[team] = {"opponent": opponent, "date": next_game['startDate'].strftime("%Y-%m-%d %H:%M")}
+    df_standings['Next Game Opponent'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('opponent', 'N/A'))
+    df_standings['Next Game Date'] = df_standings['Team'].map(lambda x: next_game_info.get(x, {}).get('date', 'N/A'))
 
     # Merge picks
     df_merged = pd.merge(df_picks, df_standings, left_on='school', right_on='Team', how='left')
@@ -174,25 +165,21 @@ def process_data(df_picks, df_teams, df_rankings, df_games):
 
     return df_leaderboard, df_merged
 
-# --- Main Streamlit ---
+# --- Streamlit App ---
 st.title("Metro Sharon CBB Draft Leaderboard")
 
 df_picks = load_draft_picks()
-df_teams, df_rankings, df_games = fetch_cbbd_data()
-df_leaderboard, df_merged_picks_standings = process_data(df_picks, df_teams, df_rankings, df_games)
+df_teams = fetch_teams()
+df_rankings = fetch_rankings()
+df_games = fetch_games()
 
-# Display latest game date
+df_leaderboard, df_merged = process_data(df_picks, df_teams, df_rankings, df_games)
+
+# Latest game date
 if not df_games.empty:
-    df_games['startDate'] = pd.to_datetime(df_games['startDate'], errors='coerce')
-    valid_dates = df_games['startDate'].dropna()
-    latest_game = valid_dates.max() if not valid_dates.empty else None
-    if latest_game:
-        latest_game = latest_game.replace(tzinfo=datetime.timezone.utc).astimezone(ZoneInfo("America/Chicago")) if latest_game.tzinfo is None else latest_game.astimezone(ZoneInfo("America/Chicago"))
-        st.caption(f"Game data as of: {latest_game.strftime('%Y-%m-%d %H:%M %Z')}")
-    else:
-        st.caption("Game data as of: N/A")
-else:
-    st.caption("Game data as of: N/A")
+    latest_game = pd.to_datetime(df_games['startDate']).max()
+    latest_game = latest_game.replace(tzinfo=datetime.timezone.utc).astimezone(ZoneInfo("America/Chicago"))
+    st.caption(f"Game data as of: {latest_game.strftime('%Y-%m-%d %H:%M %Z')}")
 
 st.caption(f"Last updated: {datetime.datetime.now(ZoneInfo('America/Chicago')).strftime('%Y-%m-%d %H:%M %Z')}")
 
@@ -208,7 +195,7 @@ st.dataframe(filtered_leaderboard)
 st.subheader("Individual Performance")
 for person in df_leaderboard['person'].unique():
     with st.expander(f"{person}'s Teams"):
-        person_df = df_merged_picks_standings[df_merged_picks_standings['person']==person][
+        person_df = df_merged[df_merged['person']==person][
             ['school_with_rank','Wins','Losses','Streak','Win Percentage']
         ].sort_values('Win Percentage', ascending=False)
         person_df = person_df.rename(columns={'school_with_rank':'school'})
