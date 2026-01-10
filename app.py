@@ -64,12 +64,17 @@ def format_win_pct(wins, losses):
 def format_game_time(dt):
     return dt.strftime("%-I:%M %p")  # 12-hour with AM/PM
 
-# --- Fetch functions ---
 @st.cache_data(ttl=3600)
 def fetch_teams():
     headers = {"Authorization": f"Bearer {API_KEY}"}
-    response = requests.get(BASE_URL_TEAMS, headers=headers)
-    response.raise_for_status()
+    params = {"season": 2026}
+
+    response = requests.get(BASE_URL_TEAMS, headers=headers, params=params)
+
+    if response.status_code != 200:
+        st.error(f"Teams API error {response.status_code}: {response.text}")
+        return pd.DataFrame()
+
     return pd.DataFrame(response.json())
 
 @st.cache_data(ttl=3600)
