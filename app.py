@@ -192,7 +192,7 @@ def generate_daily_scoreboard(df_games, df_picks, selected_date, selected_person
 tab1, tab2 = st.tabs(["Leaderboard","Daily Scoreboard"])
 
 with tab1:
-    st.title("Metro Sharon CBB Draft Leaderboard")
+    st.title("College Basketball Pool Leaderboard")
     df_picks = load_draft_picks()
     df_games = fetch_games()
     df_rankings = fetch_rankings()
